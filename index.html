@@ -161,7 +161,7 @@ a {
 </div>
 
 <div class="card">
-  <h2>曲を追加</h2>
+  <h2 id="formTitle">曲を追加</h2>
 
   <label>The Session URL</label>
   <input id="sessionUrlInput" placeholder="https://thesession.org/tunes/182">
@@ -198,7 +198,8 @@ a {
   <label>メモ</label>
   <textarea id="memoInput" placeholder="メモ"></textarea>
 
-  <button type="button" onclick="addSong()">追加</button>
+  <button id="saveButton" type="button" onclick="addOrUpdateSong()">追加</button>
+  <button id="cancelEditButton" class="sub" type="button" onclick="cancelEdit()" style="display:none;">編集をやめる</button>
 </div>
 
 <div class="card">
@@ -242,6 +243,7 @@ let songs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
 
 let currentStatusFilter = "all";
 let currentGenreFilter = "all";
+let editingId = null;
 
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(songs));
@@ -343,7 +345,7 @@ async function fetchFromSession() {
   }
 }
 
-async function addSong() {
+async function addOrUpdateSong() {
   const songTitle = document.getElementById("titleInput").value.trim();
   const songGenre = document.getElementById("genreInput").value.trim() || "Other";
   const sourceUrl = document.getElementById("urlInput").value.trim();
@@ -354,21 +356,53 @@ async function addSong() {
     return;
   }
 
-  const song = {
-    id: Date.now(),
-    title: songTitle,
-    genre: songGenre,
-    url: sourceUrl,
-    memo: songMemo,
-    done: false,
-    abc: ""
-  };
+  if (editingId !== null) {
+    songs = songs.map(song =>
+      song.id === editingId
+        ? {
+            ...song,
+            title: songTitle,
+            genre: songGenre,
+            url: sourceUrl,
+            memo: songMemo
+          }
+        : song
+    );
 
-  songs.unshift(song);
+    save();
+    clearForm();
+    render();
+
+    const editedSong = songs.find(song => song.id === editingIdBeforeClear);
+  } else {
+    const song = {
+      id: Date.now(),
+      title: songTitle,
+      genre: songGenre,
+      url: sourceUrl,
+      memo: songMemo,
+      done: false,
+      abc: ""
+    };
+
+    songs.unshift(song);
+    save();
+    clearForm();
+    render();
+
+    await loadABC(song);
+    return;
+  }
+}
+
+let editingIdBeforeClear = null;
+
+async function refreshEditedSongAbc(songId) {
+  const song = songs.find(s => s.id === songId);
+  if (!song) return;
+  song.abc = "";
   save();
-  clearForm();
   render();
-
   await loadABC(song);
 }
 
@@ -389,6 +423,10 @@ async function loadABC(song) {
       }
     }
 
+    if (!song.title) {
+      song.title = data.name || data.title || song.title;
+    }
+
     const abc = extractFirstAbc(data);
     song.abc = cleanAbc(abc, song.title);
 
@@ -397,6 +435,30 @@ async function loadABC(song) {
   } catch (e) {
     console.error(e);
   }
+}
+
+function startEdit(id) {
+  const song = songs.find(s => s.id === id);
+  if (!song) return;
+
+  editingId = id;
+  document.getElementById("formTitle").textContent = "曲を編集";
+  document.getElementById("saveButton").textContent = "保存";
+  document.getElementById("cancelEditButton").style.display = "block";
+
+  document.getElementById("sessionUrlInput").value = song.url || "";
+  document.getElementById("titleInput").value = song.title || "";
+  document.getElementById("genreInput").value = song.genre || "";
+  document.getElementById("urlInput").value = song.url || "";
+  document.getElementById("memoInput").value = song.memo || "";
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function cancelEdit() {
+  editingId = null;
+  clearForm();
+  render();
 }
 
 function setStatus(value) {
@@ -455,6 +517,10 @@ function clearForm() {
   document.getElementById("memoInput").value = "";
   document.getElementById("fetchStatus").textContent = "";
   document.getElementById("fetchStatus").className = "status";
+  document.getElementById("formTitle").textContent = "曲を追加";
+  document.getElementById("saveButton").textContent = "追加";
+  document.getElementById("cancelEditButton").style.display = "none";
+  editingId = null;
 }
 
 function escapeHtml(str) {
@@ -490,6 +556,7 @@ function render() {
       <button class="small" type="button" onclick="toggleDone(${song.id})">
         ${song.done ? "未習得に戻す" : "習得にする"}
       </button>
+      <button class="small" type="button" onclick="startEdit(${song.id})">編集</button>
       <button class="small sub" type="button" onclick="delSong(${song.id})">削除</button>
 
       <div id="abc-${song.id}" class="notation"></div>
@@ -512,6 +579,57 @@ function render() {
 
   updateStatusButtons();
 }
+
+const originalAddOrUpdateSong = addOrUpdateSong;
+addOrUpdateSong = async function() {
+  const currentEditingId = editingId;
+  editingIdBeforeClear = currentEditingId;
+
+  const songTitle = document.getElementById("titleInput").value.trim();
+  const songGenre = document.getElementById("genreInput").value.trim() || "Other";
+  const sourceUrl = document.getElementById("urlInput").value.trim();
+  const songMemo = document.getElementById("memoInput").value.trim();
+
+  if (!songTitle) {
+    alert("曲名を入力してください。");
+    return;
+  }
+
+  if (currentEditingId !== null) {
+    songs = songs.map(song =>
+      song.id === currentEditingId
+        ? {
+            ...song,
+            title: songTitle,
+            genre: songGenre,
+            url: sourceUrl,
+            memo: songMemo
+          }
+        : song
+    );
+
+    save();
+    clearForm();
+    render();
+    await refreshEditedSongAbc(currentEditingId);
+  } else {
+    const song = {
+      id: Date.now(),
+      title: songTitle,
+      genre: songGenre,
+      url: sourceUrl,
+      memo: songMemo,
+      done: false,
+      abc: ""
+    };
+
+    songs.unshift(song);
+    save();
+    clearForm();
+    render();
+    await loadABC(song);
+  }
+};
 
 render();
 </script>
