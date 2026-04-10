@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>曲管理</title>
+<style>
+body { font-family: sans-serif; padding: 20px; }
+input, select, button { margin: 5px; padding: 5px; }
+.done { text-decoration: line-through; color: gray; }
+</style>
+</head>
+<body>
+
+<h2>曲管理アプリ</h2>
+
+<input id="title" placeholder="曲名">
+<select id="genre">
+  <option>Reel</option>
+  <option>Jig</option>
+  <option>Hornpipe</option>
+</select>
+<input id="url" placeholder="URL">
+<button onclick="addSong()">追加</button>
+
+<h3>一覧</h3>
+<ul id="list"></ul>
+
+<script>
+let songs = JSON.parse(localStorage.getItem("songs")) || [];
+
+function save() {
+  localStorage.setItem("songs", JSON.stringify(songs));
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  songs.forEach((s, i) => {
+    list.innerHTML += `
+      <li class="${s.done ? 'done' : ''}">
+        ${s.title} (${s.genre})
+        <a href="${s.url}" target="_blank">[link]</a>
+        <button onclick="toggle(${i})">✔</button>
+        <button onclick="del(${i})">削除</button>
+      </li>`;
+  });
+}
+
+function addSong() {
+  songs.push({
+    title: document.getElementById("title").value,
+    genre: document.getElementById("genre").value,
+    url: document.getElementById("url").value,
+    done: false
+  });
+  save();
+  render();
+}
+
+function toggle(i) {
+  songs[i].done = !songs[i].done;
+  save();
+  render();
+}
+
+function del(i) {
+  songs.splice(i, 1);
+  save();
+  render();
+}
+
+render();
+</script>
+
+</body>
+</html>
