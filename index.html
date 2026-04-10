@@ -1,476 +1,287 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>曲管理アプリ</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-      margin: 0;
-      padding: 16px;
-      background: #f7f7f7;
-      color: #222;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>曲管理アプリ</title>
 
-    .card {
-      background: #fff;
-      border-radius: 14px;
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    }
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  padding: 16px;
+  background: #f7f7f7;
+}
 
-    h1 {
-      font-size: 24px;
-      margin: 0 0 12px;
-    }
+.card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
 
-    h2 {
-      font-size: 18px;
-      margin: 0 0 10px;
-    }
+input, select, textarea, button {
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}
 
-    input, select, textarea, button {
-      width: 100%;
-      box-sizing: border-box;
-      margin-top: 8px;
-      margin-bottom: 8px;
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #d8d8d8;
-      border-radius: 10px;
-    }
+button {
+  background: #222;
+  color: white;
+  border: none;
+}
 
-    textarea {
-      min-height: 70px;
-      resize: vertical;
-    }
+button.sub {
+  background: #666;
+}
 
-    button {
-      border: none;
-      background: #222;
-      color: #fff;
-      font-weight: 600;
-      cursor: pointer;
-    }
+button.small {
+  width: auto;
+  padding: 6px 10px;
+  margin-right: 5px;
+}
 
-    button.sub {
-      background: #666;
-    }
+button.active {
+  background: #000;
+}
 
-    button.small {
-      width: auto;
-      padding: 8px 12px;
-      font-size: 14px;
-      margin-right: 6px;
-      margin-top: 8px;
-      display: inline-block;
-    }
+.done .title {
+  text-decoration: line-through;
+  color: gray;
+}
 
-    .muted {
-      color: #666;
-      font-size: 14px;
-    }
-
-    .status {
-      font-size: 14px;
-      margin-top: 4px;
-      min-height: 20px;
-    }
-
-    .ok {
-      color: #0a7a35;
-    }
-
-    .err {
-      color: #b00020;
-    }
-
-    .song-item {
-      border-top: 1px solid #eee;
-      padding: 12px 0;
-    }
-
-    .song-item:first-child {
-      border-top: none;
-      padding-top: 0;
-    }
-
-    .title {
-      font-size: 17px;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-
-    .meta {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 6px;
-      word-break: break-word;
-    }
-
-    .done .title {
-      text-decoration: line-through;
-      color: #888;
-    }
-
-    .badge {
-      display: inline-block;
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: #efefef;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-
-    a {
-      color: #1a73e8;
-      text-decoration: none;
-    }
-
-    .filter-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-
-    .filter-label {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 4px;
-    }
-
-    @media (max-width: 640px) {
-      .filter-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+.badge {
+  font-size: 12px;
+  margin-left: 5px;
+}
+</style>
 </head>
+
 <body>
-  <div class="card">
-    <h1>曲管理アプリ</h1>
-    <div class="muted">The Session のURLを貼ると、曲名とジャンルを自動入力できます。</div>
-  </div>
 
-  <div class="card">
-    <h2 id="formTitle">曲を追加</h2>
+<div class="card">
+<h2 id="formTitle">曲を追加</h2>
 
-    <label>The Session URL</label>
-    <input id="sessionUrl" placeholder="https://thesession.org/tunes/182" />
+<input id="sessionUrl" placeholder="The Session URL">
+<button onclick="fetchFromSession()">URLから自動入力</button>
 
-    <button type="button" onclick="fetchFromSession()">URLから自動入力</button>
-    <div id="fetchStatus" class="status"></div>
+<input id="title" placeholder="曲名">
 
-    <label>曲名</label>
-    <input id="title" placeholder="曲名" />
+<select id="genre">
+<option value="">選択</option>
+<option>Reel</option>
+<option>Jig</option>
+<option>Slip Jig</option>
+<option>Hornpipe</option>
+<option>Polka</option>
+<option>Slide</option>
+<option>Waltz</option>
+<option>March</option>
+<option>Air</option>
+<option>Other</option>
+</select>
 
-    <label>ジャンル</label>
-    <select id="genre">
-      <option value="">選択してください</option>
-      <option>Reel</option>
-      <option>Jig</option>
-      <option>Slip Jig</option>
-      <option>Hornpipe</option>
-      <option>Polka</option>
-      <option>Slide</option>
-      <option>Waltz</option>
-      <option>March</option>
-      <option>Barndance</option>
-      <option>Mazurka</option>
-      <option>Strathspey</option>
-      <option>Highland</option>
-      <option>Air</option>
-      <option>Planxty</option>
-      <option>Other</option>
-    </select>
+<input id="url" placeholder="URL">
+<textarea id="memo" placeholder="メモ"></textarea>
 
-    <label>URL</label>
-    <input id="url" placeholder="元URL" />
+<button id="saveButton" onclick="addOrUpdateSong()">追加</button>
+<button class="sub" id="cancelEditButton" onclick="cancelEdit()" style="display:none;">キャンセル</button>
+</div>
 
-    <label>メモ</label>
-    <textarea id="memo" placeholder="覚えたいポイント、運指、苦手箇所など"></textarea>
+<div class="card">
 
-    <button type="button" id="saveButton" onclick="addOrUpdateSong()">追加</button>
-    <button type="button" class="sub" id="cancelEditButton" onclick="cancelEdit()" style="display:none;">編集をやめる</button>
-  </div>
+<!-- 状態ボタン -->
+<div>
+<button class="small status-btn" data-status="all" onclick="setStatusFilter('all')">全部</button>
+<button class="small status-btn" data-status="want" onclick="setStatusFilter('want')">覚えていない</button>
+<button class="small status-btn" data-status="done" onclick="setStatusFilter('done')">覚えた</button>
+</div>
 
-  <div class="card">
-    <h2>一覧</h2>
+<!-- ジャンル -->
+<select id="genreFilter" onchange="setGenreFilter(this.value)">
+<option value="all">ALL</option>
+<option value="Reel">Reel</option>
+<option value="Jig">Jig</option>
+<option value="Slip Jig">Slip Jig</option>
+<option value="Hornpipe">Hornpipe</option>
+<option value="Polka">Polka</option>
+<option value="Slide">Slide</option>
+<option value="Waltz">Waltz</option>
+<option value="March">March</option>
+<option value="Air">Air</option>
+<option value="Other">Other</option>
+</select>
 
-    <div class="filter-grid">
-      <div>
-        <div class="filter-label">状態で絞り込み</div>
-        <select id="statusFilter" onchange="setStatusFilter(this.value)">
-          <option value="all">全部</option>
-          <option value="want">覚えたい</option>
-          <option value="done">覚えた</option>
-        </select>
+<div id="list"></div>
+
+</div>
+
+<script>
+
+const STORAGE_KEY = "tuneMemoSongsV2";
+let songs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+
+let statusFilter = "all";
+let genreFilter = "all";
+let editingId = null;
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(songs));
+}
+
+function extractTuneId(url) {
+  const match = url.match(/tunes\/(\d+)/);
+  return match ? match[1] : null;
+}
+
+async function fetchFromSession() {
+  const url = document.getElementById("sessionUrl").value;
+  const id = extractTuneId(url);
+  if (!id) return;
+
+  try {
+    const res = await fetch(`https://thesession.org/tunes/${id}?format=json`);
+    const data = await res.json();
+
+    document.getElementById("title").value = data.name;
+    document.getElementById("genre").value = data.type;
+    document.getElementById("url").value = url;
+  } catch {}
+}
+
+function addOrUpdateSong() {
+  const title = document.getElementById("title").value;
+  const genre = document.getElementById("genre").value || "Other";
+  const url = document.getElementById("url").value;
+  const memo = document.getElementById("memo").value;
+
+  if (!title) return;
+
+  if (editingId !== null) {
+    songs = songs.map(s =>
+      s.id === editingId ? { ...s, title, genre, url, memo } : s
+    );
+  } else {
+    songs.unshift({
+      id: Date.now(),
+      title,
+      genre,
+      url,
+      memo,
+      done: false
+    });
+  }
+
+  save();
+  clearForm();
+  render();
+}
+
+function startEdit(id) {
+  const s = songs.find(x => x.id === id);
+
+  editingId = id;
+  document.getElementById("formTitle").textContent = "編集";
+  document.getElementById("saveButton").textContent = "保存";
+  document.getElementById("cancelEditButton").style.display = "block";
+
+  document.getElementById("title").value = s.title;
+  document.getElementById("genre").value = s.genre;
+  document.getElementById("url").value = s.url;
+  document.getElementById("memo").value = s.memo;
+}
+
+function cancelEdit() {
+  editingId = null;
+  clearForm();
+}
+
+function clearForm() {
+  document.getElementById("title").value = "";
+  document.getElementById("genre").value = "";
+  document.getElementById("url").value = "";
+  document.getElementById("memo").value = "";
+  document.getElementById("formTitle").textContent = "曲を追加";
+  document.getElementById("saveButton").textContent = "追加";
+  document.getElementById("cancelEditButton").style.display = "none";
+}
+
+function toggleDone(id) {
+  songs = songs.map(s =>
+    s.id === id ? { ...s, done: !s.done } : s
+  );
+  save();
+  render();
+}
+
+function delSong(id) {
+  songs = songs.filter(s => s.id !== id);
+  save();
+  render();
+}
+
+function setStatusFilter(v) {
+  statusFilter = v;
+  render();
+}
+
+function setGenreFilter(v) {
+  genreFilter = v;
+  render();
+}
+
+function updateStatusButtons() {
+  document.querySelectorAll(".status-btn").forEach(btn => {
+    btn.classList.remove("active");
+    if (btn.dataset.status === statusFilter) {
+      btn.classList.add("active");
+    }
+  });
+}
+
+function filteredSongs() {
+  return songs.filter(s => {
+    const statusOK =
+      statusFilter === "all" ||
+      (statusFilter === "want" && !s.done) ||
+      (statusFilter === "done" && s.done);
+
+    const genreOK =
+      genreFilter === "all" ||
+      s.genre === genreFilter;
+
+    return statusOK && genreOK;
+  });
+}
+
+function render() {
+  const list = document.getElementById("list");
+
+  list.innerHTML = filteredSongs().map(s => `
+    <div class="${s.done ? 'done' : ''}">
+      <div class="title">
+        ${s.title}
+        <span class="badge">${s.done ? "覚えた" : "覚えていない"}</span>
       </div>
-
-      <div>
-        <div class="filter-label">ジャンルで絞り込み</div>
-        <select id="genreFilter" onchange="setGenreFilter(this.value)">
-          <option value="all">全ジャンル</option>
-          <option value="Reel">Reel</option>
-          <option value="Jig">Jig</option>
-          <option value="Slip Jig">Slip Jig</option>
-          <option value="Hornpipe">Hornpipe</option>
-          <option value="Polka">Polka</option>
-          <option value="Slide">Slide</option>
-          <option value="Waltz">Waltz</option>
-          <option value="March">March</option>
-          <option value="Barndance">Barndance</option>
-          <option value="Mazurka">Mazurka</option>
-          <option value="Strathspey">Strathspey</option>
-          <option value="Highland">Highland</option>
-          <option value="Air">Air</option>
-          <option value="Planxty">Planxty</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
+      <div>${s.genre}</div>
+      ${s.url ? `<a href="${s.url}" target="_blank">リンク</a>` : ""}
+      <div>${s.memo || ""}</div>
+      <button class="small" onclick="toggleDone(${s.id})">切替</button>
+      <button class="small" onclick="startEdit(${s.id})">編集</button>
+      <button class="small sub" onclick="delSong(${s.id})">削除</button>
     </div>
+  `).join("");
 
-    <div id="list"></div>
-  </div>
+  updateStatusButtons();
+}
 
-  <script>
-    const STORAGE_KEY = "tuneMemoSongsV2";
-    let songs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    let statusFilter = "all";
-    let genreFilter = "all";
-    let editingId = null;
+render();
 
-    function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(songs));
-    }
+</script>
 
-    function normalizeGenre(type) {
-      if (!type) return "Other";
-      const t = String(type).toLowerCase();
-
-      if (t === "reel") return "Reel";
-      if (t === "jig") return "Jig";
-      if (t === "slip jig") return "Slip Jig";
-      if (t === "hornpipe") return "Hornpipe";
-      if (t === "polka") return "Polka";
-      if (t === "slide") return "Slide";
-      if (t === "waltz") return "Waltz";
-      if (t === "march") return "March";
-      if (t === "barndance") return "Barndance";
-      if (t === "mazurka") return "Mazurka";
-      if (t === "strathspey") return "Strathspey";
-      if (t === "highland") return "Highland";
-      if (t === "air") return "Air";
-      if (t === "planxty") return "Planxty";
-
-      return "Other";
-    }
-
-    function extractTuneId(url) {
-      try {
-        const u = new URL(url);
-        const match = u.pathname.match(/\/tunes\/(\d+)/);
-        return match ? match[1] : null;
-      } catch {
-        return null;
-      }
-    }
-
-    async function fetchFromSession() {
-      const status = document.getElementById("fetchStatus");
-      const inputUrl = document.getElementById("sessionUrl").value.trim();
-
-      status.className = "status";
-      status.textContent = "";
-
-      if (!inputUrl) {
-        status.classList.add("err");
-        status.textContent = "URLを入力してください。";
-        return;
-      }
-
-      const tuneId = extractTuneId(inputUrl);
-      if (!tuneId) {
-        status.classList.add("err");
-        status.textContent = "The Session の tune URL を入れてください。";
-        return;
-      }
-
-      const apiUrl = `https://thesession.org/tunes/${tuneId}?format=json`;
-      status.textContent = "取得中…";
-
-      try {
-        const res = await fetch(apiUrl);
-        if (!res.ok) throw new Error("API取得失敗");
-
-        const data = await res.json();
-        const title = data.name || data.title || "";
-        const genre = normalizeGenre(data.type);
-
-        document.getElementById("title").value = title;
-        document.getElementById("genre").value = genre;
-        document.getElementById("url").value = inputUrl;
-
-        status.classList.add("ok");
-        status.textContent = "自動入力できました。";
-      } catch (e) {
-        console.error(e);
-        document.getElementById("url").value = inputUrl;
-        status.classList.add("err");
-        status.textContent = "自動取得できませんでした。URLだけ入れたので、曲名は手入力してください。";
-      }
-    }
-
-    function addOrUpdateSong() {
-      const title = document.getElementById("title").value.trim();
-      const genre = document.getElementById("genre").value.trim() || "Other";
-      const url = document.getElementById("url").value.trim();
-      const memo = document.getElementById("memo").value.trim();
-
-      if (!title) {
-        alert("曲名を入れてください。");
-        return;
-      }
-
-      if (editingId !== null) {
-        songs = songs.map(song =>
-          song.id === editingId
-            ? { ...song, title, genre, url, memo }
-            : song
-        );
-      } else {
-        songs.unshift({
-          id: Date.now(),
-          title,
-          genre,
-          url,
-          memo,
-          done: false
-        });
-      }
-
-      save();
-      clearForm();
-      render();
-    }
-
-    function startEdit(id) {
-      const song = songs.find(s => s.id === id);
-      if (!song) return;
-
-      editingId = id;
-      document.getElementById("formTitle").textContent = "曲を編集";
-      document.getElementById("saveButton").textContent = "保存";
-      document.getElementById("cancelEditButton").style.display = "block";
-
-      document.getElementById("sessionUrl").value = song.url || "";
-      document.getElementById("title").value = song.title || "";
-      document.getElementById("genre").value = song.genre || "";
-      document.getElementById("url").value = song.url || "";
-      document.getElementById("memo").value = song.memo || "";
-
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    function cancelEdit() {
-      editingId = null;
-      clearForm();
-      render();
-    }
-
-    function clearForm() {
-      document.getElementById("sessionUrl").value = "";
-      document.getElementById("title").value = "";
-      document.getElementById("genre").value = "";
-      document.getElementById("url").value = "";
-      document.getElementById("memo").value = "";
-      document.getElementById("fetchStatus").textContent = "";
-      document.getElementById("fetchStatus").className = "status";
-      document.getElementById("formTitle").textContent = "曲を追加";
-      document.getElementById("saveButton").textContent = "追加";
-      document.getElementById("cancelEditButton").style.display = "none";
-      editingId = null;
-    }
-
-    function toggleDone(id) {
-      songs = songs.map(song =>
-        song.id === id ? { ...song, done: !song.done } : song
-      );
-      save();
-      render();
-    }
-
-    function delSong(id) {
-      if (!confirm("削除しますか？")) return;
-      songs = songs.filter(song => song.id !== id);
-      save();
-      render();
-    }
-
-    function setStatusFilter(value) {
-      statusFilter = value;
-      render();
-    }
-
-    function setGenreFilter(value) {
-      genreFilter = value;
-      render();
-    }
-
-    function filteredSongs() {
-      return songs.filter(song => {
-        const matchesStatus =
-          statusFilter === "all" ||
-          (statusFilter === "want" && !song.done) ||
-          (statusFilter === "done" && song.done);
-
-        const matchesGenre =
-          genreFilter === "all" ||
-          (song.genre || "Other") === genreFilter;
-
-        return matchesStatus && matchesGenre;
-      });
-    }
-
-    function escapeHtml(str) {
-      return String(str || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
-
-    function render() {
-      const list = document.getElementById("list");
-      const items = filteredSongs();
-
-      if (items.length === 0) {
-        list.innerHTML = `<div class="muted">該当する曲がありません。</div>`;
-        return;
-      }
-
-      list.innerHTML = items.map(song => `
-        <div class="song-item ${song.done ? "done" : ""}">
-          <div class="title">
-            ${escapeHtml(song.title)}
-            <span class="badge">${song.done ? "覚えた" : "覚えたい"}</span>
-          </div>
-          <div class="meta">ジャンル: ${escapeHtml(song.genre)}</div>
-          ${song.url ? `<div class="meta"><a href="${escapeHtml(song.url)}" target="_blank" rel="noopener noreferrer">The Session を開く</a></div>` : ""}
-          ${song.memo ? `<div class="meta">メモ: ${escapeHtml(song.memo)}</div>` : ""}
-          <button class="small" type="button" onclick="toggleDone(${song.id})">${song.done ? "未習得に戻す" : "覚えたにする"}</button>
-          <button class="small" type="button" onclick="startEdit(${song.id})">編集</button>
-          <button class="small sub" type="button" onclick="delSong(${song.id})">削除</button>
-        </div>
-      `).join("");
-    }
-
-    render();
-  </script>
 </body>
 </html>
