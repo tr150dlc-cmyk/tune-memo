@@ -130,10 +130,23 @@
       text-decoration: none;
     }
 
-    .top-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .filter-label {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 640px) {
+      .filter-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -187,18 +200,48 @@
 
   <div class="card">
     <h2>一覧</h2>
-    <div class="top-actions">
-      <button class="sub small" type="button" onclick="showAll()">全部</button>
-      <button class="sub small" type="button" onclick="showWant()">覚えたい</button>
-      <button class="sub small" type="button" onclick="showDone()">覚えた</button>
+
+    <div class="filter-grid">
+      <div>
+        <div class="filter-label">状態で絞り込み</div>
+        <select id="statusFilter" onchange="setStatusFilter(this.value)">
+          <option value="all">全部</option>
+          <option value="want">覚えたい</option>
+          <option value="done">覚えた</option>
+        </select>
+      </div>
+
+      <div>
+        <div class="filter-label">ジャンルで絞り込み</div>
+        <select id="genreFilter" onchange="setGenreFilter(this.value)">
+          <option value="all">全ジャンル</option>
+          <option value="Reel">Reel</option>
+          <option value="Jig">Jig</option>
+          <option value="Slip Jig">Slip Jig</option>
+          <option value="Hornpipe">Hornpipe</option>
+          <option value="Polka">Polka</option>
+          <option value="Slide">Slide</option>
+          <option value="Waltz">Waltz</option>
+          <option value="March">March</option>
+          <option value="Barndance">Barndance</option>
+          <option value="Mazurka">Mazurka</option>
+          <option value="Strathspey">Strathspey</option>
+          <option value="Highland">Highland</option>
+          <option value="Air">Air</option>
+          <option value="Planxty">Planxty</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
     </div>
+
     <div id="list"></div>
   </div>
 
   <script>
-    const STORAGE_KEY = "tuneMemoSongsV3";
+    const STORAGE_KEY = "tuneMemoSongsV2";
     let songs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    let filterMode = "all";
+    let statusFilter = "all";
+    let genreFilter = "all";
     let editingId = null;
 
     function save() {
@@ -368,25 +411,29 @@
       render();
     }
 
-    function showAll() {
-      filterMode = "all";
+    function setStatusFilter(value) {
+      statusFilter = value;
       render();
     }
 
-    function showWant() {
-      filterMode = "want";
-      render();
-    }
-
-    function showDone() {
-      filterMode = "done";
+    function setGenreFilter(value) {
+      genreFilter = value;
       render();
     }
 
     function filteredSongs() {
-      if (filterMode === "want") return songs.filter(s => !s.done);
-      if (filterMode === "done") return songs.filter(s => s.done);
-      return songs;
+      return songs.filter(song => {
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "want" && !song.done) ||
+          (statusFilter === "done" && song.done);
+
+        const matchesGenre =
+          genreFilter === "all" ||
+          (song.genre || "Other") === genreFilter;
+
+        return matchesStatus && matchesGenre;
+      });
     }
 
     function escapeHtml(str) {
@@ -403,7 +450,7 @@
       const items = filteredSongs();
 
       if (items.length === 0) {
-        list.innerHTML = `<div class="muted">まだ曲がありません。</div>`;
+        list.innerHTML = `<div class="muted">該当する曲がありません。</div>`;
         return;
       }
 
