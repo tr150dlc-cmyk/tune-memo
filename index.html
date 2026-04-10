@@ -23,7 +23,7 @@ body {
   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
 }
 
-h1, h2 {
+h1, h2, h3 {
   margin-top: 0;
 }
 
@@ -80,12 +80,14 @@ button.active {
   flex: 1;
 }
 
-.song-item {
+.song-item,
+.set-item {
   border-top: 1px solid #eee;
   padding: 14px 0;
 }
 
-.song-item:first-child {
+.song-item:first-child,
+.set-item:first-child {
   border-top: none;
   padding-top: 0;
 }
@@ -165,6 +167,54 @@ a {
   color: #666;
   font-size: 14px;
 }
+
+.set-box {
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.set-song-row {
+  border-top: 1px solid #e5e5e5;
+  padding: 10px 0;
+}
+
+.set-song-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.row-flex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row-flex > * {
+  flex: 1;
+  min-width: 180px;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.inline-actions button {
+  width: auto;
+  margin: 0;
+}
+
+.section-note {
+  font-size: 13px;
+  color: #666;
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
 </style>
 </head>
 
@@ -172,7 +222,7 @@ a {
 
 <div class="card">
   <h1>曲管理アプリ</h1>
-  <div class="muted">The Session URL から曲名・ジャンルを自動入力し、楽譜を常時表示します。</div>
+  <div class="muted">The Session URL から曲名・ジャンルを自動入力し、楽譜を常時表示します。登録済みの曲から SET も作れます。</div>
 </div>
 
 <div class="card">
@@ -218,6 +268,29 @@ a {
 </div>
 
 <div class="card">
+  <h2>SETを作成</h2>
+  <div class="section-note">登録済みの曲を選んで、順番つきのSETを作れます。</div>
+
+  <label>SET名</label>
+  <input id="setNameInput" placeholder="例: Session用 Reel Set 1">
+
+  <button type="button" onclick="createSet()">SETを作成</button>
+
+  <div class="row-flex">
+    <div>
+      <label>追加先SET</label>
+      <select id="setSelect"></select>
+    </div>
+    <div>
+      <label>追加する曲</label>
+      <select id="songSelect"></select>
+    </div>
+  </div>
+
+  <button type="button" onclick="addSongToSelectedSet()">選んだ曲をSETに追加</button>
+</div>
+
+<div class="card">
   <h2>一覧</h2>
 
   <div class="filter-row">
@@ -252,16 +325,33 @@ a {
   <div id="list"></div>
 </div>
 
+<div class="card">
+  <h2>SET一覧</h2>
+  <div id="setList"></div>
+</div>
+
 <script>
 const STORAGE_KEY = "songs";
+const SETS_STORAGE_KEY = "sets";
+
 let songs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+let sets = JSON.parse(localStorage.getItem(SETS_STORAGE_KEY)) || [];
 
 let currentStatusFilter = "all";
 let currentGenreFilter = "all";
 let editingId = null;
 
-function save() {
+function saveSongs() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(songs));
+}
+
+function saveSets() {
+  localStorage.setItem(SETS_STORAGE_KEY, JSON.stringify(sets));
+}
+
+function saveAll() {
+  saveSongs();
+  saveSets();
 }
 
 function extractTuneId(url) {
@@ -334,10 +424,16 @@ function linkifyText(text) {
   const escaped = escapeHtml(text);
   const urlRegex = /(https?:\/\/[^\s<]+)/g;
   return escaped
-    .replace(urlRegex, (url) => {
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-    })
+    .replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`)
     .replace(/\n/g, "<br>");
+}
+
+function getSongById(id) {
+  return songs.find(song => song.id === id);
+}
+
+function getSetById(id) {
+  return sets.find(set => set.id === id);
 }
 
 async function fetchFromSession() {
@@ -362,11 +458,8 @@ async function fetchFromSession() {
 
     const data = await res.json();
 
-    const songTitle = data.name || data.title || "";
-    const songGenre = normalizeGenre(data.type);
-
-    document.getElementById("titleInput").value = songTitle;
-    document.getElementById("genreInput").value = songGenre;
+    document.getElementById("titleInput").value = data.name || data.title || "";
+    document.getElementById("genreInput").value = normalizeGenre(data.type);
     document.getElementById("urlInput").value = sessionUrl;
 
     statusEl.classList.add("ok");
@@ -391,9 +484,7 @@ async function loadABC(song) {
 
     if (!song.genre || song.genre === "Other") {
       const fetchedGenre = normalizeGenre(data.type);
-      if (fetchedGenre) {
-        song.genre = fetchedGenre;
-      }
+      if (fetchedGenre) song.genre = fetchedGenre;
     }
 
     if (!song.title) {
@@ -403,8 +494,8 @@ async function loadABC(song) {
     const abc = extractFirstAbc(data);
     song.abc = cleanAbc(abc, song.title);
 
-    save();
-    render();
+    saveSongs();
+    renderAll();
   } catch (e) {
     console.error(e);
   }
@@ -439,9 +530,9 @@ async function addOrUpdateSong() {
     );
 
     const updatedId = editingId;
-    save();
+    saveSongs();
     clearForm();
-    render();
+    renderAll();
 
     const updatedSong = songs.find(song => song.id === updatedId);
     if (updatedSong && sourceUrl && oldUrl !== sourceUrl) {
@@ -461,9 +552,9 @@ async function addOrUpdateSong() {
   };
 
   songs.unshift(song);
-  save();
+  saveSongs();
   clearForm();
-  render();
+  renderAll();
 
   await loadABC(song);
 }
@@ -489,17 +580,83 @@ function startEdit(id) {
 function cancelEdit() {
   editingId = null;
   clearForm();
-  render();
+  renderAll();
+}
+
+function createSet() {
+  const name = document.getElementById("setNameInput").value.trim();
+  if (!name) {
+    alert("SET名を入力してください。");
+    return;
+  }
+
+  sets.unshift({
+    id: Date.now(),
+    name,
+    songIds: []
+  });
+
+  saveSets();
+  document.getElementById("setNameInput").value = "";
+  renderAll();
+}
+
+function addSongToSelectedSet() {
+  const setId = Number(document.getElementById("setSelect").value);
+  const songId = Number(document.getElementById("songSelect").value);
+
+  if (!setId || !songId) {
+    alert("SETと曲を選んでください。");
+    return;
+  }
+
+  const set = getSetById(setId);
+  if (!set) return;
+
+  set.songIds.push(songId);
+  saveSets();
+  renderAll();
+}
+
+function removeSongFromSet(setId, index) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  set.songIds.splice(index, 1);
+  saveSets();
+  renderAll();
+}
+
+function moveSongInSet(setId, index, direction) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= set.songIds.length) return;
+
+  const temp = set.songIds[index];
+  set.songIds[index] = set.songIds[newIndex];
+  set.songIds[newIndex] = temp;
+
+  saveSets();
+  renderAll();
+}
+
+function deleteSet(setId) {
+  if (!confirm("このSETを削除しますか？")) return;
+  sets = sets.filter(set => set.id !== setId);
+  saveSets();
+  renderAll();
 }
 
 function setStatus(value) {
   currentStatusFilter = value;
-  render();
+  renderSongs();
 }
 
 function setGenreFilter(value) {
   currentGenreFilter = value;
-  render();
+  renderSongs();
 }
 
 function updateStatusButtons() {
@@ -530,15 +687,22 @@ function toggleDone(id) {
   songs = songs.map(song =>
     song.id === id ? { ...song, done: !song.done } : song
   );
-  save();
-  render();
+  saveSongs();
+  renderSongs();
+  updateSetSelectors();
 }
 
 function delSong(id) {
-  if (!confirm("削除しますか？")) return;
+  if (!confirm("削除しますか？\nSETに入っている場合、そのSETからも消えます。")) return;
+
   songs = songs.filter(song => song.id !== id);
-  save();
-  render();
+  sets = sets.map(set => ({
+    ...set,
+    songIds: set.songIds.filter(songId => songId !== id)
+  }));
+
+  saveAll();
+  renderAll();
 }
 
 function clearForm() {
@@ -555,7 +719,28 @@ function clearForm() {
   editingId = null;
 }
 
-function render() {
+function updateSetSelectors() {
+  const setSelect = document.getElementById("setSelect");
+  const songSelect = document.getElementById("songSelect");
+
+  if (sets.length === 0) {
+    setSelect.innerHTML = `<option value="">SETがありません</option>`;
+  } else {
+    setSelect.innerHTML = sets.map(set =>
+      `<option value="${set.id}">${escapeHtml(set.name)}</option>`
+    ).join("");
+  }
+
+  if (songs.length === 0) {
+    songSelect.innerHTML = `<option value="">曲がありません</option>`;
+  } else {
+    songSelect.innerHTML = songs.map(song =>
+      `<option value="${song.id}">${escapeHtml(song.title)} (${escapeHtml(song.genre || "Other")})</option>`
+    ).join("");
+  }
+}
+
+function renderSongs() {
   const list = document.getElementById("list");
   const items = filteredSongs();
 
@@ -603,7 +788,51 @@ function render() {
   updateStatusButtons();
 }
 
-render();
+function renderSets() {
+  const setList = document.getElementById("setList");
+
+  if (sets.length === 0) {
+    setList.innerHTML = `<div class="muted">まだSETがありません。</div>`;
+    return;
+  }
+
+  setList.innerHTML = sets.map(set => {
+    const rows = set.songIds.map((songId, index) => {
+      const song = getSongById(songId);
+      if (!song) return "";
+
+      return `
+        <div class="set-song-row">
+          <div class="title">${index + 1}. ${escapeHtml(song.title)}</div>
+          <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
+          <div class="inline-actions">
+            <button class="small" type="button" onclick="moveSongInSet(${set.id}, ${index}, -1)">上へ</button>
+            <button class="small" type="button" onclick="moveSongInSet(${set.id}, ${index}, 1)">下へ</button>
+            <button class="small sub" type="button" onclick="removeSongFromSet(${set.id}, ${index})">SETから削除</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="set-item">
+        <div class="title">${escapeHtml(set.name)}</div>
+        <button class="small sub" type="button" onclick="deleteSet(${set.id})">SET削除</button>
+        <div class="set-box">
+          ${rows || `<div class="muted">まだ曲が入っていません。</div>`}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderAll() {
+  updateSetSelectors();
+  renderSongs();
+  renderSets();
+}
+
+renderAll();
 </script>
 
 </body>
