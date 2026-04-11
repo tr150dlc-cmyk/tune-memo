@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>曲管理アプリ</title>
+<title>アイリッシュＴｕｎｅ 記録帳</title>
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6.6.2/dist/abcjs-basic-min.js"></script>
 
 <style>
@@ -131,21 +131,12 @@ button.active {
   font-size: 18px;
   font-weight: 700;
   margin-bottom: 6px;
+  color: #222;
 }
 
 .done .title {
-  text-decoration: line-through;
-  color: gray;
-}
-
-.badge {
-  display: inline-block;
-  font-size: 12px;
-  margin-left: 6px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #efefef;
-  vertical-align: middle;
+  color: #2a72d8;
+  text-decoration: none;
 }
 
 .meta {
@@ -467,11 +458,11 @@ function cleanAbc(abc, title) {
   let text = String(abc || "").trim();
   if (!text) return "";
 
-  if (!/^X:/m.test(text)) text = "X:1\\n" + text;
-  if (!/^T:/m.test(text)) text = `T:${title || "Tune"}\\n` + text;
-  if (!/^M:/m.test(text)) text = "M:4/4\\n" + text;
-  if (!/^L:/m.test(text)) text = "L:1/8\\n" + text;
-  if (!/^K:/m.test(text)) text = "K:D\\n" + text;
+  if (!/^X:/m.test(text)) text = "X:1\n" + text;
+  if (!/^T:/m.test(text)) text = `T:${title || "Tune"}\n` + text;
+  if (!/^M:/m.test(text)) text = "M:4/4\n" + text;
+  if (!/^L:/m.test(text)) text = "L:1/8\n" + text;
+  if (!/^K:/m.test(text)) text = "K:D\n" + text;
 
   return text;
 }
@@ -501,10 +492,10 @@ function escapeHtml(str) {
 
 function linkifyText(text) {
   const escaped = escapeHtml(text);
-  const urlRegex = /(https?:\\/\\/[^\\s<]+)/g;
+  const urlRegex = /(https?:\/\/[^\s<]+)/g;
   return escaped
     .replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`)
-    .replace(/\\n/g, "<br>");
+    .replace(/\n/g, "<br>");
 }
 
 function getSongById(id) {
@@ -585,6 +576,7 @@ async function addOrUpdateSong() {
   const songGenre = document.getElementById("genreInput").value.trim() || "Other";
   const sourceUrl = document.getElementById("urlInput").value.trim();
   const songMemo = document.getElementById("memoInput").value.trim();
+  const sessionUrlValue = document.getElementById("sessionUrlInput").value.trim();
 
   if (!songTitle) {
     alert("曲名を入力してください。");
@@ -637,7 +629,9 @@ async function addOrUpdateSong() {
   renderAll();
   switchTab("songList");
 
-  await loadABC(song);
+  if (sourceUrl || sessionUrlValue) {
+    await loadABC(song);
+  }
 }
 
 function startEdit(id) {
@@ -777,7 +771,7 @@ function toggleDone(id) {
 }
 
 function delSong(id) {
-  if (!confirm("削除しますか？\\nSETに入っている場合、そのSETからも消えます。")) return;
+  if (!confirm("削除しますか？\nSETに入っている場合、そのSETからも消えます。")) return;
 
   songs = songs.filter(song => song.id !== id);
   sets = sets.map(set => ({
@@ -836,10 +830,7 @@ function renderSongs() {
 
   list.innerHTML = items.map(song => `
     <div class="song-item ${song.done ? 'done' : ''}">
-      <div class="title">
-        ${escapeHtml(song.title)}
-        <span class="badge">${song.done ? "習得" : "未習得"}</span>
-      </div>
+      <div class="title">${escapeHtml(song.title)}</div>
 
       <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
       ${song.url ? `<div class="meta"><a href="${escapeHtml(song.url)}" target="_blank" rel="noopener noreferrer">The Session を開く</a></div>` : ""}
