@@ -7,12 +7,20 @@
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6.6.2/dist/abcjs-basic-min.js"></script>
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap');
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Zen Maru Gothic', sans-serif;
   padding: 16px;
   margin: 0;
-  background: #f5f5f7;
-  color: #222;
+  background: #fdfbf7;
+  color: #555;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.03) 1px,
+    transparent 1px
+  );
+  background-size: 100% 28px; /* ノート罫線 */
 }
 
 .container {
@@ -20,239 +28,134 @@ body {
   margin: 0 auto;
 }
 
+/* カード */
 .card {
-  background: #fff;
-  padding: 16px;
-  border-radius: 16px;
+  background: #fffefb;
+  padding: 20px;
+  border-radius: 18px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+  border: 1px solid #f1f1f1;
 }
 
-h1, h2, h3 {
-  margin-top: 0;
+/* タイトル */
+h1::before {
+  content: "🎼 ";
 }
 
-input, select, textarea, button {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 12px;
-  margin-top: 8px;
-  margin-bottom: 8px;
-  border-radius: 12px;
-  border: 1px solid #d0d0d0;
-  font-size: 16px;
-}
-
-textarea {
-  min-height: 120px;
-  resize: vertical;
-}
-
-button {
-  background: #222;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-}
-
-button.sub {
-  background: #666;
-}
-
-button.small {
-  width: auto;
-  padding: 8px 12px;
-  margin-right: 6px;
-  margin-top: 8px;
-  display: inline-block;
-  font-size: 14px;
-}
-
-button.active {
-  background: #000;
-}
-
-.top-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.tab-btn {
-  background: #e9e9ec;
-  color: #222;
-  border: none;
-  border-radius: 12px;
-  padding: 12px 10px;
-  font-size: 14px;
+h1 {
+  color: #6b7280;
   font-weight: 600;
 }
 
-.tab-btn.active {
-  background: #222;
+/* 入力 */
+input, select, textarea {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+}
+
+/* ボタン */
+button {
+  background: #a5d8ff;
   color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 15px;
+  transition: 0.2s;
 }
 
-.tab-panel {
-  display: none;
+button:hover {
+  background: #74c0fc;
 }
 
-.tab-panel.active {
-  display: block;
+button.sub {
+  background: #dee2e6;
 }
 
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 10px;
+button.sub:hover {
+  background: #adb5bd;
 }
 
-.filter-select {
-  min-width: 220px;
-  flex: 1;
+button.small {
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
-.song-item,
-.set-item {
-  border-top: 1px solid #eee;
-  padding: 14px 0;
-}
-
-.song-item:first-child,
-.set-item:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: #222;
-}
-
-.done .title {
-  color: #2a72d8;
-  text-decoration: none;
-}
-
-.meta {
-  font-size: 14px;
+/* タブ */
+.tab-btn {
+  background: #f1f3f5;
   color: #666;
-  margin-bottom: 6px;
-  word-break: break-word;
-}
-
-.memo-block {
-  font-size: 14px;
-  color: #333;
-  margin-bottom: 6px;
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-.memo-block a {
-  color: #1a73e8;
-  text-decoration: underline;
-  word-break: break-all;
-}
-
-.notation {
-  margin-top: 10px;
-  overflow-x: auto;
-  background: #fafafa;
-  border: 1px solid #e5e5e5;
   border-radius: 12px;
   padding: 10px;
 }
 
-.status {
+.tab-btn.active {
+  background: #a5d8ff;
+  color: white;
+}
+
+/* 曲カード */
+.song-item {
+  border-top: 1px dashed #e5e7eb;
+  padding: 16px 0;
+}
+
+/* 曲名 */
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #495057;
+}
+
+/* 習得済 */
+.done .title {
+  color: #74c69d; /* やさしいグリーン */
+}
+
+/* メモ */
+.memo-block {
+  background: #fffdf7;
+  border-left: 4px solid #ffe066;
+  padding: 10px;
+  border-radius: 10px;
   font-size: 14px;
-  min-height: 20px;
-  margin-top: 4px;
-}
-
-.ok {
-  color: #0a7a35;
-}
-
-.err {
-  color: #b00020;
-}
-
-a {
-  color: #1a73e8;
-  text-decoration: none;
-}
-
-.muted {
-  color: #666;
-  font-size: 14px;
-}
-
-.set-box {
-  background: #fafafa;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 10px;
-}
-
-.set-song-row {
-  border-top: 1px solid #e5e5e5;
-  padding: 10px 0;
-}
-
-.set-song-row:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.row-flex {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.row-flex > * {
-  flex: 1;
-  min-width: 180px;
-}
-
-.inline-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
   margin-top: 6px;
 }
 
-.inline-actions button {
-  width: auto;
-  margin: 0;
+/* リンク */
+.memo-block a {
+  color: #339af0;
+  text-decoration: underline;
 }
 
-.section-note {
-  font-size: 13px;
-  color: #666;
-  margin-top: -4px;
-  margin-bottom: 8px;
-}
-
-.empty-box {
-  padding: 18px;
-  border: 1px dashed #ccc;
+/* 楽譜 */
+.notation {
+  margin-top: 10px;
+  background: #ffffff;
+  border: 1px solid #f1f3f5;
   border-radius: 12px;
-  color: #666;
-  background: #fafafa;
+  padding: 10px;
 }
 
-@media (max-width: 720px) {
-  .top-tabs {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* SET */
+.set-box {
+  background: #fffefb;
+  border: 1px solid #f1f3f5;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+/* 空 */
+.empty-box {
+  background: #fff;
+  border: 1px dashed #ddd;
+  border-radius: 12px;
+  padding: 16px;
+  color: #aaa;
 }
 </style>
 </head>
