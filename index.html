@@ -20,7 +20,7 @@ body {
     rgba(0,0,0,0.03) 1px,
     transparent 1px
   );
-  background-size: 100% 28px; /* ノート罫線 */
+  background-size: 100% 28px;
 }
 
 .container {
@@ -28,7 +28,6 @@ body {
   margin: 0 auto;
 }
 
-/* カード */
 .card {
   background: #fffefb;
   padding: 20px;
@@ -38,7 +37,6 @@ body {
   border: 1px solid #f1f1f1;
 }
 
-/* タイトル */
 h1::before {
   content: "🎼 ";
 }
@@ -48,16 +46,16 @@ h1 {
   font-weight: 600;
 }
 
-/* 入力 */
 input, select, textarea {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 12px;
   font-size: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-/* ボタン */
 button {
   background: #a5d8ff;
   color: #fff;
@@ -66,6 +64,9 @@ button {
   padding: 12px;
   font-size: 15px;
   transition: 0.2s;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 button:hover {
@@ -83,81 +84,11 @@ button.sub:hover {
 button.small {
   padding: 6px 10px;
   font-size: 13px;
+  width: auto;
+  margin-right: 6px;
+  margin-top: 8px;
 }
 
-/* タブ */
-.tab-btn {
-  background: #f1f3f5;
-  color: #666;
-  border-radius: 12px;
-  padding: 10px;
-}
-
-.tab-btn.active {
-  background: #a5d8ff;
-  color: white;
-}
-
-/* 曲カード */
-.song-item {
-  border-top: 1px dashed #e5e7eb;
-  padding: 16px 0;
-}
-
-/* 曲名 */
-.title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #495057;
-}
-
-/* 習得済 */
-.done .title {
-  color: #74c69d; /* やさしいグリーン */
-}
-
-/* メモ */
-.memo-block {
-  background: #fffdf7;
-  border-left: 4px solid #ffe066;
-  padding: 10px;
-  border-radius: 10px;
-  font-size: 14px;
-  margin-top: 6px;
-}
-
-/* リンク */
-.memo-block a {
-  color: #339af0;
-  text-decoration: underline;
-}
-
-/* 楽譜 */
-.notation {
-  margin-top: 10px;
-  background: #ffffff;
-  border: 1px solid #f1f3f5;
-  border-radius: 12px;
-  padding: 10px;
-}
-
-/* SET */
-.set-box {
-  background: #fffefb;
-  border: 1px solid #f1f3f5;
-  border-radius: 14px;
-  padding: 12px;
-}
-
-/* 空 */
-.empty-box {
-  background: #fff;
-  border: 1px dashed #ddd;
-  border-radius: 12px;
-  padding: 16px;
-  color: #aaa;
-}
-  /* タブレイアウト修正 */
 .top-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -165,7 +96,6 @@ button.small {
   margin-bottom: 16px;
 }
 
-/* タブボタン整形 */
 .tab-btn {
   background: #f1f3f5;
   color: #666;
@@ -176,25 +106,203 @@ button.small {
   white-space: nowrap;
 }
 
-/* アクティブタブ */
 .tab-btn.active {
   background: #a5d8ff;
   color: white;
   font-weight: 600;
 }
 
-/* スマホ対応 */
-@media (max-width: 720px) {
-  .top-tabs {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 .tab-panel {
   display: none;
 }
 
 .tab-panel.active {
   display: block;
+}
+
+.song-item {
+  border-top: 1px dashed #e5e7eb;
+  padding: 16px 0;
+}
+
+.song-item:first-child,
+.set-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.done .title {
+  color: #74c69d;
+}
+
+.memo-block {
+  background: #fffdf7;
+  border-left: 4px solid #ffe066;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-top: 6px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.memo-block a {
+  color: #339af0;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.notation {
+  margin-top: 10px;
+  background: #ffffff;
+  border: 1px solid #f1f3f5;
+  border-radius: 12px;
+  padding: 10px;
+  overflow-x: auto;
+}
+
+.set-box {
+  background: #fffefb;
+  border: 1px solid #f1f3f5;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.empty-box {
+  background: #fff;
+  border: 1px dashed #ddd;
+  border-radius: 12px;
+  padding: 16px;
+  color: #aaa;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.filter-select {
+  min-width: 220px;
+  flex: 1;
+}
+
+.meta {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+
+.muted {
+  color: #666;
+  font-size: 14px;
+}
+
+.section-note {
+  font-size: 13px;
+  color: #666;
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
+
+.row-flex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row-flex > * {
+  flex: 1;
+  min-width: 180px;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.inline-actions button {
+  width: auto;
+  margin: 0;
+}
+
+.set-item {
+  border-top: 1px solid #eee;
+  padding: 14px 0;
+}
+
+.set-song-row {
+  border-top: 1px solid #e5e5e5;
+  padding: 10px 0;
+}
+
+.set-song-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.status {
+  font-size: 14px;
+  min-height: 20px;
+  margin-top: 4px;
+}
+
+.ok {
+  color: #0a7a35;
+}
+
+.err {
+  color: #b00020;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #eee;
+}
+
+.check-item input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  transform: scale(1.2);
+}
+
+.check-item label {
+  margin: 0;
+  flex: 1;
+  font-size: 14px;
+  color: #444;
+}
+
+a {
+  color: #339af0;
+}
+
+@media (max-width: 720px) {
+  .top-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>
 </head>
@@ -298,25 +406,27 @@ button.small {
   <div id="tab-createSet" class="tab-panel">
     <div class="card">
       <h2>SETの作成</h2>
-      <div class="section-note">登録済みの曲を選んでSETを作れます。</div>
+      <div class="section-note">登録済みの曲を複数選んで、まとめてSETを作れます。</div>
 
       <label>SET名</label>
       <input id="setNameInput" placeholder="例: Reel Set 1">
 
-      <button type="button" onclick="createSet()">SETを作成</button>
+      <label>SETに入れる曲（複数選択）</label>
+      <div id="songChecklistForNewSet" class="set-box"></div>
 
-      <div class="row-flex">
-        <div>
-          <label>追加先SET</label>
-          <select id="setSelect"></select>
-        </div>
-        <div>
-          <label>追加する曲</label>
-          <select id="songSelect"></select>
-        </div>
-      </div>
+      <button type="button" onclick="createSetWithSongs()">選んだ曲でSETを作成</button>
 
-      <button type="button" onclick="addSongToSelectedSet()">選んだ曲をSETに追加</button>
+      <hr style="margin:20px 0; border:none; border-top:1px solid #eee;">
+
+      <h3>既存SETに曲をまとめて追加</h3>
+
+      <label>追加先SET</label>
+      <select id="setSelect"></select>
+
+      <label>追加する曲（複数選択）</label>
+      <div id="songChecklistForExistingSet" class="set-box"></div>
+
+      <button type="button" onclick="addCheckedSongsToSelectedSet()">選んだ曲をSETに追加</button>
     </div>
   </div>
 
@@ -601,17 +711,29 @@ function cancelEdit() {
   renderAll();
 }
 
-function createSet() {
+function getCheckedSongIds(selector) {
+  return Array.from(document.querySelectorAll(selector + ":checked"))
+    .map(el => Number(el.value));
+}
+
+function createSetWithSongs() {
   const name = document.getElementById("setNameInput").value.trim();
+  const selectedSongIds = getCheckedSongIds(".song-check-new");
+
   if (!name) {
     alert("SET名を入力してください。");
+    return;
+  }
+
+  if (selectedSongIds.length === 0) {
+    alert("曲を1曲以上選んでください。");
     return;
   }
 
   sets.unshift({
     id: Date.now(),
     name,
-    songIds: []
+    songIds: selectedSongIds
   });
 
   saveSets();
@@ -620,19 +742,25 @@ function createSet() {
   switchTab("setList");
 }
 
-function addSongToSelectedSet() {
+function addCheckedSongsToSelectedSet() {
   const setId = Number(document.getElementById("setSelect").value);
-  const songId = Number(document.getElementById("songSelect").value);
+  const selectedSongIds = getCheckedSongIds(".song-check-existing");
 
-  if (!setId || !songId) {
-    alert("SETと曲を選んでください。");
+  if (!setId) {
+    alert("SETを選んでください。");
+    return;
+  }
+
+  if (selectedSongIds.length === 0) {
+    alert("曲を1曲以上選んでください。");
     return;
   }
 
   const set = getSetById(setId);
   if (!set) return;
 
-  set.songIds.push(songId);
+  set.songIds.push(...selectedSongIds);
+
   saveSets();
   renderAll();
   switchTab("setList");
@@ -741,7 +869,8 @@ function clearForm() {
 
 function updateSetSelectors() {
   const setSelect = document.getElementById("setSelect");
-  const songSelect = document.getElementById("songSelect");
+
+  if (!setSelect) return;
 
   if (sets.length === 0) {
     setSelect.innerHTML = `<option value="">SETがありません</option>`;
@@ -750,19 +879,44 @@ function updateSetSelectors() {
       `<option value="${set.id}">${escapeHtml(set.name)}</option>`
     ).join("");
   }
+}
 
-  if (songs.length === 0) {
-    songSelect.innerHTML = `<option value="">曲がありません</option>`;
-  } else {
-    songSelect.innerHTML = songs.map(song =>
-      `<option value="${song.id}">${escapeHtml(song.title)} (${escapeHtml(song.genre || "Other")})</option>`
-    ).join("");
+function renderSongChecklists() {
+  const newSetBox = document.getElementById("songChecklistForNewSet");
+  const existingSetBox = document.getElementById("songChecklistForExistingSet");
+
+  const newItems = songs.map(song => `
+    <div class="check-item">
+      <input type="checkbox" class="song-check-new" value="${song.id}" id="new-song-${song.id}">
+      <label for="new-song-${song.id}">${escapeHtml(song.title)} (${escapeHtml(song.genre || "Other")})</label>
+    </div>
+  `).join("");
+
+  const existingItems = songs.map(song => `
+    <div class="check-item">
+      <input type="checkbox" class="song-check-existing" value="${song.id}" id="existing-song-${song.id}">
+      <label for="existing-song-${song.id}">${escapeHtml(song.title)} (${escapeHtml(song.genre || "Other")})</label>
+    </div>
+  `).join("");
+
+  if (newSetBox) {
+    newSetBox.innerHTML = songs.length
+      ? `<div class="checklist">${newItems}</div>`
+      : `<div class="muted">曲がありません。</div>`;
+  }
+
+  if (existingSetBox) {
+    existingSetBox.innerHTML = songs.length
+      ? `<div class="checklist">${existingItems}</div>`
+      : `<div class="muted">曲がありません。</div>`;
   }
 }
 
 function renderSongs() {
   const list = document.getElementById("list");
   const items = filteredSongs();
+
+  if (!list) return;
 
   if (items.length === 0) {
     list.innerHTML = `<div class="empty-box">該当する曲がありません。</div>`;
@@ -808,6 +962,8 @@ function renderSongs() {
 function renderSets() {
   const setList = document.getElementById("setList");
 
+  if (!setList) return;
+
   if (sets.length === 0) {
     setList.innerHTML = `<div class="empty-box">まだSETがありません。</div>`;
     return;
@@ -845,6 +1001,7 @@ function renderSets() {
 
 function renderAll() {
   updateSetSelectors();
+  renderSongChecklists();
   renderSongs();
   renderSets();
 }
