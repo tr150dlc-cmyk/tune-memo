@@ -419,9 +419,9 @@ a {
     </div>
   </div>
 
+<div id="tab-createSet" class="tab-panel">
   <div class="card">
-  <h2>SETの作成</h2>
-
+    <h2>SETの作成</h2>
   <label>SET名</label>
   <input id="setNameInput" placeholder="例: Reel Set 1">
 
@@ -444,7 +444,9 @@ a {
     <option>Planxty</option>
     <option>Other</option>
   </select>
-
+  </div>
+</div>
+  
   <label>曲を選択</label>
   <select id="songSelectForSet"></select>
 
@@ -1138,7 +1140,89 @@ function updateSongSelectForSet() {
     `<option value="${song.id}">${escapeHtml(song.title)}</option>`
   ).join("");
 }
-  
+  let tempSetSongs = [];
+
+function addSongToTempSet() {
+  const select = document.getElementById("songSelectForSet");
+  const songId = Number(select.value);
+
+  if (!songId) return;
+
+  tempSetSongs.push(songId);
+  renderTempSet();
+}
+
+function renderTempSet() {
+  const box = document.getElementById("tempSetList");
+
+  if (!box) return;
+
+  if (tempSetSongs.length === 0) {
+    box.innerHTML = `<div class="muted">まだ曲がありません</div>`;
+    return;
+  }
+
+  box.innerHTML = tempSetSongs.map((songId, index) => {
+    const song = getSongById(songId);
+    if (!song) return "";
+
+    return `
+      <div class="set-song-row">
+        <div>${index + 1}. ${escapeHtml(song.title)}</div>
+
+        <button class="small" onclick="moveTempSong(${index}, -1)">↑</button>
+        <button class="small" onclick="moveTempSong(${index}, 1)">↓</button>
+        <button class="small sub" onclick="removeTempSong(${index})">削除</button>
+      </div>
+    `;
+  }).join("");
+}
+
+function moveTempSong(index, direction) {
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= tempSetSongs.length) return;
+
+  const temp = tempSetSongs[index];
+  tempSetSongs[index] = tempSetSongs[newIndex];
+  tempSetSongs[newIndex] = temp;
+
+  renderTempSet();
+}
+
+function removeTempSong(index) {
+  tempSetSongs.splice(index, 1);
+  renderTempSet();
+}
+
+function saveTempSet() {
+  const name = document.getElementById("setNameInput").value.trim();
+
+  if (!name) {
+    alert("SET名を入力してください");
+    return;
+  }
+
+  if (tempSetSongs.length === 0) {
+    alert("曲を追加してください");
+    return;
+  }
+
+  sets.unshift({
+    id: Date.now(),
+    name,
+    songIds: [...tempSetSongs],
+    memo: ""
+  });
+
+  saveSets();
+
+  tempSetSongs = [];
+  document.getElementById("setNameInput").value = "";
+  renderTempSet();
+
+  renderAll();
+  switchTab("setList");
+}
 renderAll();
 </script>
 </body>
