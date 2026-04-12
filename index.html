@@ -867,6 +867,35 @@ function editSet(setId) {
       <textarea id="editSetMemo">${escapeHtml(set.memo || "")}</textarea>
 
       <div style="margin-top:12px;">
+        <h3>曲を追加</h3>
+
+        <label>ジャンルで絞り込み</label>
+        <select id="editSetGenreFilter" onchange="updateEditSetSongSelect()">
+          <option value="all">ALL</option>
+          <option>Reel</option>
+          <option>Jig</option>
+          <option>Slip Jig</option>
+          <option>Hornpipe</option>
+          <option>Polka</option>
+          <option>Slide</option>
+          <option>Waltz</option>
+          <option>March</option>
+          <option>Barndance</option>
+          <option>Mazurka</option>
+          <option>Strathspey</option>
+          <option>Highland</option>
+          <option>Air</option>
+          <option>Planxty</option>
+          <option>Other</option>
+        </select>
+
+        <label>追加する曲</label>
+        <select id="editSetSongSelect"></select>
+
+        <button type="button" onclick="addSongToExistingSet(${set.id})">このSETに曲を追加</button>
+      </div>
+
+      <div style="margin-top:12px;">
         <h3>曲の順番</h3>
         <div id="editSetSongs"></div>
       </div>
@@ -878,6 +907,7 @@ function editSet(setId) {
     </div>
   `;
 
+  updateEditSetSongSelect();
   renderEditSetSongs(set);
 }
 
@@ -1055,7 +1085,41 @@ function renderAll() {
   renderSongs();
   renderSets();
 }
+function updateEditSetSongSelect() {
+  const genre = document.getElementById("editSetGenreFilter")?.value || "all";
+  const select = document.getElementById("editSetSongSelect");
 
+  if (!select) return;
+
+  let filtered = songs;
+
+  if (genre !== "all") {
+    filtered = songs.filter(song => (song.genre || "Other") === genre);
+  }
+
+  if (filtered.length === 0) {
+    select.innerHTML = `<option value="">該当なし</option>`;
+    return;
+  }
+
+  select.innerHTML = filtered.map(song =>
+    `<option value="${song.id}">${escapeHtml(song.title)} (${escapeHtml(song.genre || "Other")})</option>`
+  ).join("");
+}
+
+function addSongToExistingSet(setId) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  const select = document.getElementById("editSetSongSelect");
+  const songId = Number(select?.value);
+
+  if (!songId) return;
+
+  set.songIds.push(songId);
+  saveSets();
+  renderEditSetSongs(set);
+}
 renderAll();
 </script>
 </body>
