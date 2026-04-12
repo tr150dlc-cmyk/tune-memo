@@ -120,7 +120,8 @@ button.small {
   display: block;
 }
 
-.song-item {
+.song-item,
+.set-item {
   border-top: 1px dashed #e5e7eb;
   padding: 16px 0;
 }
@@ -160,6 +161,7 @@ button.small {
 
 .notation {
   margin-top: 10px;
+  margin-bottom: 8px;
   background: #ffffff;
   border: 1px solid #f1f3f5;
   border-radius: 12px;
@@ -207,39 +209,16 @@ button.small {
   font-size: 14px;
 }
 
-.section-note {
-  font-size: 13px;
-  color: #666;
-  margin-top: -4px;
-  margin-bottom: 8px;
-}
-
-.row-flex {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.row-flex > * {
-  flex: 1;
-  min-width: 180px;
-}
-
 .inline-actions {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .inline-actions button {
   width: auto;
   margin: 0;
-}
-
-.set-item {
-  border-top: 1px solid #eee;
-  padding: 14px 0;
 }
 
 .set-song-row {
@@ -266,44 +245,10 @@ button.small {
   color: #b00020;
 }
 
-.checklist {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.check-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid #eee;
-}
-
-.check-item input[type="checkbox"] {
-  width: auto;
-  margin: 0;
-  transform: scale(1.2);
-}
-
-.check-item label {
-  margin: 0;
-  flex: 1;
-  font-size: 14px;
-  color: #444;
-}
-
 a {
   color: #339af0;
 }
 
-@media (max-width: 720px) {
-  .top-tabs {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 #setNameInput {
   margin-bottom: 12px;
 }
@@ -319,7 +264,12 @@ a {
 #tempSetList {
   min-height: 60px;
 }
-  
+
+@media (max-width: 720px) {
+  .top-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 </style>
 </head>
 
@@ -419,46 +369,44 @@ a {
     </div>
   </div>
 
-<div id="tab-createSet" class="tab-panel">
-  <div class="card">
-    <h2>SETの作成</h2>
+  <div id="tab-createSet" class="tab-panel">
+    <div class="card">
+      <h2>SETの作成</h2>
 
-    <label>SET名</label>
-    <input id="setNameInput" placeholder="例: Reel Set 1">
+      <label>SET名</label>
+      <input id="setNameInput" placeholder="例: Reel Set 1">
 
-    <label>ジャンルで絞り込み</label>
-    <select id="genreFilterForSet" onchange="updateSongSelectForSet()">
-      <option value="all">ALL</option>
-      <option>Reel</option>
-      <option>Jig</option>
-      <option>Slip Jig</option>
-      <option>Hornpipe</option>
-      <option>Polka</option>
-      <option>Slide</option>
-      <option>Waltz</option>
-      <option>March</option>
-      <option>Barndance</option>
-      <option>Mazurka</option>
-      <option>Strathspey</option>
-      <option>Highland</option>
-      <option>Air</option>
-      <option>Planxty</option>
-      <option>Other</option>
-    </select>
+      <label>ジャンルで絞り込み</label>
+      <select id="genreFilterForSet" onchange="updateSongSelectForSet()">
+        <option value="all">ALL</option>
+        <option>Reel</option>
+        <option>Jig</option>
+        <option>Slip Jig</option>
+        <option>Hornpipe</option>
+        <option>Polka</option>
+        <option>Slide</option>
+        <option>Waltz</option>
+        <option>March</option>
+        <option>Barndance</option>
+        <option>Mazurka</option>
+        <option>Strathspey</option>
+        <option>Highland</option>
+        <option>Air</option>
+        <option>Planxty</option>
+        <option>Other</option>
+      </select>
 
-    <label>曲を選択</label>
-    <select id="songSelectForSet"></select>
+      <label>曲を選択</label>
+      <select id="songSelectForSet"></select>
 
-    <button type="button" onclick="addSongToTempSet()">曲を追加</button>
+      <button type="button" onclick="addSongToTempSet()">曲を追加</button>
 
-    <h3>選択した曲</h3>
-    <div id="tempSetList" class="set-box"></div>
+      <h3>選択した曲</h3>
+      <div id="tempSetList" class="set-box"></div>
 
-    <button type="button" onclick="saveTempSet()">SET登録</button>
+      <button type="button" onclick="saveTempSet()">SET登録</button>
+    </div>
   </div>
-</div>
-  
-
 
   <div id="tab-setList" class="tab-panel">
     <div class="card">
@@ -480,6 +428,7 @@ let currentStatusFilter = "all";
 let currentGenreFilter = "all";
 let editingId = null;
 let currentTab = "addSong";
+let tempSetSongs = [];
 
 function switchTab(tabName) {
   currentTab = tabName;
@@ -741,92 +690,6 @@ function cancelEdit() {
   renderAll();
 }
 
-function getCheckedSongIds(selector) {
-  return Array.from(document.querySelectorAll(selector + ":checked"))
-    .map(el => Number(el.value));
-}
-
-function createSetWithSongs() {
-  const name = document.getElementById("setNameInput").value.trim();
-  const selectedSongIds = getCheckedSongIds(".song-check-new");
-
-  if (!name) {
-    alert("SET名を入力してください。");
-    return;
-  }
-
-  if (selectedSongIds.length === 0) {
-    alert("曲を1曲以上選んでください。");
-    return;
-  }
-
-  sets.unshift({
-    id: Date.now(),
-    name,
-    songIds: selectedSongIds
-  });
-
-  saveSets();
-  document.getElementById("setNameInput").value = "";
-  renderAll();
-  switchTab("setList");
-}
-
-function addCheckedSongsToSelectedSet() {
-  const setId = Number(document.getElementById("setSelect").value);
-  const selectedSongIds = getCheckedSongIds(".song-check-existing");
-
-  if (!setId) {
-    alert("SETを選んでください。");
-    return;
-  }
-
-  if (selectedSongIds.length === 0) {
-    alert("曲を1曲以上選んでください。");
-    return;
-  }
-
-  const set = getSetById(setId);
-  if (!set) return;
-
-  set.songIds.push(...selectedSongIds);
-
-  saveSets();
-  renderAll();
-  switchTab("setList");
-}
-
-function removeSongFromSet(setId, index) {
-  const set = getSetById(setId);
-  if (!set) return;
-
-  set.songIds.splice(index, 1);
-  saveSets();
-  renderAll();
-}
-
-function moveSongInSet(setId, index, direction) {
-  const set = getSetById(setId);
-  if (!set) return;
-
-  const newIndex = index + direction;
-  if (newIndex < 0 || newIndex >= set.songIds.length) return;
-
-  const temp = set.songIds[index];
-  set.songIds[index] = set.songIds[newIndex];
-  set.songIds[newIndex] = temp;
-
-  saveSets();
-  renderAll();
-}
-
-function deleteSet(setId) {
-  if (!confirm("このSETを削除しますか？")) return;
-  sets = sets.filter(set => set.id !== setId);
-  saveSets();
-  renderAll();
-}
-
 function setStatus(value) {
   currentStatusFilter = value;
   renderSongs();
@@ -867,7 +730,6 @@ function toggleDone(id) {
   );
   saveSongs();
   renderSongs();
-  updateSetSelectors();
 }
 
 function delSong(id) {
@@ -897,51 +759,6 @@ function clearForm() {
   editingId = null;
 }
 
-function updateSetSelectors() {
-  const setSelect = document.getElementById("setSelect");
-
-  if (!setSelect) return;
-
-  if (sets.length === 0) {
-    setSelect.innerHTML = `<option value="">SETがありません</option>`;
-  } else {
-    setSelect.innerHTML = sets.map(set =>
-      `<option value="${set.id}">${escapeHtml(set.name)}</option>`
-    ).join("");
-  }
-}
-
-function renderSongChecklists() {
-  const newSetBox = document.getElementById("songChecklistForNewSet");
-  const existingSetBox = document.getElementById("songChecklistForExistingSet");
-
-  const newItems = songs.map(song => `
-    <div class="check-item">
-      <input type="checkbox" class="song-check-new" value="${song.id}" id="new-song-${song.id}">
-      <label for="new-song-${song.id}">${escapeHtml(song.title)} (${escapeHtml(song.genre || "Other")})</label>
-    </div>
-  `).join("");
-
-  const existingItems = songs.map(song => `
-    <div class="check-item">
-      <input type="checkbox" class="song-check-existing" value="${song.id}" id="existing-song-${song.id}">
-      <label for="existing-song-${song.id}">${escapeHtml(song.title)} (${escapeHtml(song.genre || "Other")})</label>
-    </div>
-  `).join("");
-
-  if (newSetBox) {
-    newSetBox.innerHTML = songs.length
-      ? `<div class="checklist">${newItems}</div>`
-      : `<div class="muted">曲がありません。</div>`;
-  }
-
-  if (existingSetBox) {
-    existingSetBox.innerHTML = songs.length
-      ? `<div class="checklist">${existingItems}</div>`
-      : `<div class="muted">曲がありません。</div>`;
-  }
-}
-
 function renderSongs() {
   const list = document.getElementById("list");
   const items = filteredSongs();
@@ -954,35 +771,23 @@ function renderSongs() {
     return;
   }
 
-list.innerHTML = items.map(song => `
-  <div class="song-item ${song.done ? 'done' : ''}">
-    
-    <!-- 曲名 -->
-    <div class="title">${escapeHtml(song.title)}</div>
+  list.innerHTML = items.map(song => `
+    <div class="song-item ${song.done ? 'done' : ''}">
+      <div class="title">${escapeHtml(song.title)}</div>
+      <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
+      <div id="abc-${song.id}" class="notation"></div>
+      ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
+      ${song.url ? `<div class="meta"><a href="${escapeHtml(song.url)}" target="_blank" rel="noopener noreferrer">The Session を開く</a></div>` : ""}
 
-    <!-- ジャンル -->
-    <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
-
-    <!-- 楽譜 -->
-    <div id="abc-${song.id}" class="notation"></div>
-
-    <!-- メモ -->
-    ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
-
-    <!-- URL -->
-    ${song.url ? `<div class="meta"><a href="${escapeHtml(song.url)}" target="_blank">The Session を開く</a></div>` : ""}
-
-    <!-- ボタン -->
-    <div class="inline-actions">
-      <button class="small" onclick="toggleDone(${song.id})">
-        ${song.done ? "未習得に戻す" : "習得にする"}
-      </button>
-      <button class="small" onclick="startEdit(${song.id})">編集</button>
-      <button class="small sub" onclick="delSong(${song.id})">削除</button>
+      <div class="inline-actions">
+        <button class="small" type="button" onclick="toggleDone(${song.id})">
+          ${song.done ? "未習得に戻す" : "習得にする"}
+        </button>
+        <button class="small" type="button" onclick="startEdit(${song.id})">編集</button>
+        <button class="small sub" type="button" onclick="delSong(${song.id})">削除</button>
+      </div>
     </div>
-
-  </div>
-`).join("");
+  `).join("");
 
   items.forEach(song => {
     if (song.abc) {
@@ -1001,6 +806,14 @@ list.innerHTML = items.map(song => `
   updateStatusButtons();
 }
 
+function updateSetMemo(setId, value) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  set.memo = value;
+  saveSets();
+}
+
 function renderSets() {
   const setList = document.getElementById("setList");
 
@@ -1012,49 +825,34 @@ function renderSets() {
   }
 
   setList.innerHTML = sets.map(set => {
-
-    const songsHtml = set.songIds.map((songId) => {
+    const songsHtml = set.songIds.map(songId => {
       const song = getSongById(songId);
       if (!song) return "";
-      return `<div>・${escapeHtml(song.title)}</div>`;
+      return `<div class="meta">${escapeHtml(song.title)}</div>`;
     }).join("");
 
     return `
       <div class="set-item">
         <div class="title">${escapeHtml(set.name)}</div>
 
-        <button class="small" onclick="editSet(${set.id})">編集</button>
-        <button class="small sub" onclick="deleteSet(${set.id})">削除</button>
-
         <div class="set-box">
           ${songsHtml || `<div class="muted">曲がありません</div>`}
+          ${
+            set.memo
+              ? `<div class="memo-block" style="margin-top:10px;">${linkifyText(set.memo)}</div>`
+              : `<div class="muted" style="margin-top:10px;">メモなし</div>`
+          }
+        </div>
 
-          <div style="margin-top:10px;">
-            <textarea 
-              placeholder="メモ（参考URLなど）"
-              onchange="updateSetMemo(${set.id}, this.value)"
-            >${escapeHtml(set.memo || "")}</textarea>
-          </div>
+        <div class="inline-actions">
+          <button class="small" type="button" onclick="editSet(${set.id})">編集</button>
+          <button class="small sub" type="button" onclick="deleteSet(${set.id})">削除</button>
         </div>
       </div>
     `;
   }).join("");
 }
 
-function renderAll() {
-  updateSetSelectors();
-  updateSongSelectForSet(); // ←これ
-  renderTempSet();
-  renderSongs();
-  renderSets();
-}
-function updateSetMemo(setId, value) {
-  const set = getSetById(setId);
-  if (!set) return;
-
-  set.memo = value;
-  saveSets();
-}
 function editSet(setId) {
   const set = getSetById(setId);
   if (!set) return;
@@ -1073,7 +871,7 @@ function editSet(setId) {
         <div id="editSetSongs"></div>
       </div>
 
-      <div style="margin-top:16px;">
+      <div style="margin-top:16px;" class="inline-actions">
         <button onclick="saveSetEdit(${set.id})">保存</button>
         <button class="sub" onclick="renderAll()">戻る</button>
       </div>
@@ -1082,8 +880,10 @@ function editSet(setId) {
 
   renderEditSetSongs(set);
 }
-  function renderEditSetSongs(set) {
+
+function renderEditSetSongs(set) {
   const box = document.getElementById("editSetSongs");
+  if (!box) return;
 
   box.innerHTML = set.songIds.map((songId, index) => {
     const song = getSongById(songId);
@@ -1092,15 +892,17 @@ function editSet(setId) {
     return `
       <div class="set-song-row">
         <div>${index + 1}. ${escapeHtml(song.title)}</div>
-
-        <button class="small" onclick="moveSongInSet(${set.id}, ${index}, -1)">↑</button>
-        <button class="small" onclick="moveSongInSet(${set.id}, ${index}, 1)">↓</button>
-        <button class="small sub" onclick="removeSongFromSet(${set.id}, ${index})">削除</button>
+        <div class="inline-actions">
+          <button class="small" onclick="moveSongInSet(${set.id}, ${index}, -1)">↑</button>
+          <button class="small" onclick="moveSongInSet(${set.id}, ${index}, 1)">↓</button>
+          <button class="small sub" onclick="removeSongFromSet(${set.id}, ${index})">削除</button>
+        </div>
       </div>
     `;
   }).join("");
 }
-  function moveSongInSet(setId, index, direction) {
+
+function moveSongInSet(setId, index, direction) {
   const set = getSetById(setId);
   if (!set) return;
 
@@ -1112,9 +914,10 @@ function editSet(setId) {
   set.songIds[newIndex] = temp;
 
   saveSets();
-  renderEditSetSongs(set); // ←ここ重要
+  renderEditSetSongs(set);
 }
-  function removeSongFromSet(setId, index) {
+
+function removeSongFromSet(setId, index) {
   const set = getSetById(setId);
   if (!set) return;
 
@@ -1122,17 +925,25 @@ function editSet(setId) {
   saveSets();
   renderEditSetSongs(set);
 }
-  function saveSetEdit(setId) {
+
+function saveSetEdit(setId) {
   const set = getSetById(setId);
   if (!set) return;
 
   const memo = document.getElementById("editSetMemo").value;
-
   set.memo = memo;
 
   saveSets();
   renderAll();
 }
+
+function deleteSet(setId) {
+  if (!confirm("このSETを削除しますか？")) return;
+  sets = sets.filter(set => set.id !== setId);
+  saveSets();
+  renderAll();
+}
+
 function updateSongSelectForSet() {
   const select = document.getElementById("songSelectForSet");
   const genre = document.getElementById("genreFilterForSet")?.value || "all";
@@ -1154,7 +965,6 @@ function updateSongSelectForSet() {
     `<option value="${song.id}">${escapeHtml(song.title)}</option>`
   ).join("");
 }
-  let tempSetSongs = [];
 
 function addSongToTempSet() {
   const select = document.getElementById("songSelectForSet");
@@ -1183,10 +993,11 @@ function renderTempSet() {
     return `
       <div class="set-song-row">
         <div>${index + 1}. ${escapeHtml(song.title)}</div>
-
-        <button class="small" onclick="moveTempSong(${index}, -1)">↑</button>
-        <button class="small" onclick="moveTempSong(${index}, 1)">↓</button>
-        <button class="small sub" onclick="removeTempSong(${index})">削除</button>
+        <div class="inline-actions">
+          <button class="small" onclick="moveTempSong(${index}, -1)">↑</button>
+          <button class="small" onclick="moveTempSong(${index}, 1)">↓</button>
+          <button class="small sub" onclick="removeTempSong(${index})">削除</button>
+        </div>
       </div>
     `;
   }).join("");
@@ -1237,6 +1048,14 @@ function saveTempSet() {
   renderAll();
   switchTab("setList");
 }
+
+function renderAll() {
+  updateSongSelectForSet();
+  renderTempSet();
+  renderSongs();
+  renderSets();
+}
+
 renderAll();
 </script>
 </body>
