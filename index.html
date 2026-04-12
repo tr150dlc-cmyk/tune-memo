@@ -999,36 +999,6 @@ function renderSets() {
   }).join("");
 }
 
-  setList.innerHTML = sets.map(set => {
-    const rows = set.songIds.map((songId, index) => {
-      const song = getSongById(songId);
-      if (!song) return "";
-
-      return `
-        <div class="set-song-row">
-          <div class="title">${index + 1}. ${escapeHtml(song.title)}</div>
-          <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
-          <div class="inline-actions">
-            <button class="small" type="button" onclick="moveSongInSet(${set.id}, ${index}, -1)">上へ</button>
-            <button class="small" type="button" onclick="moveSongInSet(${set.id}, ${index}, 1)">下へ</button>
-            <button class="small sub" type="button" onclick="removeSongFromSet(${set.id}, ${index})">SETから削除</button>
-          </div>
-        </div>
-      `;
-    }).join("");
-
-    return `
-      <div class="set-item">
-        <div class="title">${escapeHtml(set.name)}</div>
-        <button class="small sub" type="button" onclick="deleteSet(${set.id})">SET削除</button>
-        <div class="set-box">
-          ${rows || `<div class="muted">まだ曲が入っていません。</div>`}
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
 function renderAll() {
   updateSetSelectors();
   renderSongChecklists();
