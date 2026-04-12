@@ -422,28 +422,39 @@ a {
 <div id="tab-createSet" class="tab-panel">
   <div class="card">
     <h2>SETの作成</h2>
-  <label>SET名</label>
-  <input id="setNameInput" placeholder="例: Reel Set 1">
 
-  <label>ジャンルで絞り込み</label>
-  <select id="genreFilterForSet" onchange="updateSongSelectForSet()">
-    <option value="all">ALL</option>
-    <option>Reel</option>
-    <option>Jig</option>
-    <option>Slip Jig</option>
-    <option>Hornpipe</option>
-    <option>Polka</option>
-    <option>Slide</option>
-    <option>Waltz</option>
-    <option>March</option>
-    <option>Barndance</option>
-    <option>Mazurka</option>
-    <option>Strathspey</option>
-    <option>Highland</option>
-    <option>Air</option>
-    <option>Planxty</option>
-    <option>Other</option>
-  </select>
+    <label>SET名</label>
+    <input id="setNameInput" placeholder="例: Reel Set 1">
+
+    <label>ジャンルで絞り込み</label>
+    <select id="genreFilterForSet" onchange="updateSongSelectForSet()">
+      <option value="all">ALL</option>
+      <option>Reel</option>
+      <option>Jig</option>
+      <option>Slip Jig</option>
+      <option>Hornpipe</option>
+      <option>Polka</option>
+      <option>Slide</option>
+      <option>Waltz</option>
+      <option>March</option>
+      <option>Barndance</option>
+      <option>Mazurka</option>
+      <option>Strathspey</option>
+      <option>Highland</option>
+      <option>Air</option>
+      <option>Planxty</option>
+      <option>Other</option>
+    </select>
+
+    <label>曲を選択</label>
+    <select id="songSelectForSet"></select>
+
+    <button type="button" onclick="addSongToTempSet()">曲を追加</button>
+
+    <h3>選択した曲</h3>
+    <div id="tempSetList" class="set-box"></div>
+
+    <button type="button" onclick="saveTempSet()">SET登録</button>
   </div>
 </div>
   
