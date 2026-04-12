@@ -970,6 +970,36 @@ function renderSets() {
   }
 
   setList.innerHTML = sets.map(set => {
+
+    const songsHtml = set.songIds.map((songId) => {
+      const song = getSongById(songId);
+      if (!song) return "";
+      return `<div>・${escapeHtml(song.title)}</div>`;
+    }).join("");
+
+    return `
+      <div class="set-item">
+        <div class="title">${escapeHtml(set.name)}</div>
+
+        <button class="small" onclick="editSet(${set.id})">編集</button>
+        <button class="small sub" onclick="deleteSet(${set.id})">削除</button>
+
+        <div class="set-box">
+          ${songsHtml || `<div class="muted">曲がありません</div>`}
+
+          <div style="margin-top:10px;">
+            <textarea 
+              placeholder="メモ（参考URLなど）"
+              onchange="updateSetMemo(${set.id}, this.value)"
+            >${escapeHtml(set.memo || "")}</textarea>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+  setList.innerHTML = sets.map(set => {
     const rows = set.songIds.map((songId, index) => {
       const song = getSongById(songId);
       if (!song) return "";
@@ -1005,7 +1035,91 @@ function renderAll() {
   renderSongs();
   renderSets();
 }
+function updateSetMemo(setId, value) {
+  const set = getSetById(setId);
+  if (!set) return;
 
+  set.memo = value;
+  saveSets();
+}
+function editSet(setId) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  const container = document.getElementById("setList");
+
+  container.innerHTML = `
+    <div class="card">
+      <h2>${escapeHtml(set.name)}（編集）</h2>
+
+      <label>メモ（参考URLなど）</label>
+      <textarea id="editSetMemo">${escapeHtml(set.memo || "")}</textarea>
+
+      <div style="margin-top:12px;">
+        <h3>曲の順番</h3>
+        <div id="editSetSongs"></div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <button onclick="saveSetEdit(${set.id})">保存</button>
+        <button class="sub" onclick="renderAll()">戻る</button>
+      </div>
+    </div>
+  `;
+
+  renderEditSetSongs(set);
+}
+  function renderEditSetSongs(set) {
+  const box = document.getElementById("editSetSongs");
+
+  box.innerHTML = set.songIds.map((songId, index) => {
+    const song = getSongById(songId);
+    if (!song) return "";
+
+    return `
+      <div class="set-song-row">
+        <div>${index + 1}. ${escapeHtml(song.title)}</div>
+
+        <button class="small" onclick="moveSongInSet(${set.id}, ${index}, -1)">↑</button>
+        <button class="small" onclick="moveSongInSet(${set.id}, ${index}, 1)">↓</button>
+        <button class="small sub" onclick="removeSongFromSet(${set.id}, ${index})">削除</button>
+      </div>
+    `;
+  }).join("");
+}
+  function moveSongInSet(setId, index, direction) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= set.songIds.length) return;
+
+  const temp = set.songIds[index];
+  set.songIds[index] = set.songIds[newIndex];
+  set.songIds[newIndex] = temp;
+
+  saveSets();
+  renderEditSetSongs(set); // ←ここ重要
+}
+  function removeSongFromSet(setId, index) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  set.songIds.splice(index, 1);
+  saveSets();
+  renderEditSetSongs(set);
+}
+  function saveSetEdit(setId) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  const memo = document.getElementById("editSetMemo").value;
+
+  set.memo = memo;
+
+  saveSets();
+  renderAll();
+}
 renderAll();
 </script>
 </body>
