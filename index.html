@@ -954,23 +954,35 @@ function renderSongs() {
     return;
   }
 
-  list.innerHTML = items.map(song => `
-    <div class="song-item ${song.done ? 'done' : ''}">
-      <div class="title">${escapeHtml(song.title)}</div>
+list.innerHTML = items.map(song => `
+  <div class="song-item ${song.done ? 'done' : ''}">
+    
+    <!-- 曲名 -->
+    <div class="title">${escapeHtml(song.title)}</div>
 
-      <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
-      ${song.url ? `<div class="meta"><a href="${escapeHtml(song.url)}" target="_blank" rel="noopener noreferrer">The Session を開く</a></div>` : ""}
-      ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
+    <!-- ジャンル -->
+    <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
 
-      <button class="small" type="button" onclick="toggleDone(${song.id})">
+    <!-- 楽譜 -->
+    <div id="abc-${song.id}" class="notation"></div>
+
+    <!-- メモ -->
+    ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
+
+    <!-- URL -->
+    ${song.url ? `<div class="meta"><a href="${escapeHtml(song.url)}" target="_blank">The Session を開く</a></div>` : ""}
+
+    <!-- ボタン -->
+    <div class="inline-actions">
+      <button class="small" onclick="toggleDone(${song.id})">
         ${song.done ? "未習得に戻す" : "習得にする"}
       </button>
-      <button class="small" type="button" onclick="startEdit(${song.id})">編集</button>
-      <button class="small sub" type="button" onclick="delSong(${song.id})">削除</button>
-
-      <div id="abc-${song.id}" class="notation"></div>
+      <button class="small" onclick="startEdit(${song.id})">編集</button>
+      <button class="small sub" onclick="delSong(${song.id})">削除</button>
     </div>
-  `).join("");
+
+  </div>
+`).join("");
 
   items.forEach(song => {
     if (song.abc) {
