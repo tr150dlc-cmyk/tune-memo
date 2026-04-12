@@ -304,6 +304,22 @@ a {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+#setNameInput {
+  margin-bottom: 12px;
+}
+
+#genreFilterForSet {
+  margin-bottom: 8px;
+}
+
+#songSelectForSet {
+  margin-bottom: 8px;
+}
+
+#tempSetList {
+  min-height: 60px;
+}
+  
 </style>
 </head>
 
@@ -403,32 +419,42 @@ a {
     </div>
   </div>
 
-  <div id="tab-createSet" class="tab-panel">
-    <div class="card">
-      <h2>SETの作成</h2>
-      <div class="section-note">登録済みの曲を複数選んで、まとめてSETを作れます。</div>
+  <div class="card">
+  <h2>SETの作成</h2>
 
-      <label>SET名</label>
-      <input id="setNameInput" placeholder="例: Reel Set 1">
+  <label>SET名</label>
+  <input id="setNameInput" placeholder="例: Reel Set 1">
 
-      <label>SETに入れる曲（複数選択）</label>
-      <div id="songChecklistForNewSet" class="set-box"></div>
+  <label>ジャンルで絞り込み</label>
+  <select id="genreFilterForSet" onchange="updateSongSelectForSet()">
+    <option value="all">ALL</option>
+    <option>Reel</option>
+    <option>Jig</option>
+    <option>Slip Jig</option>
+    <option>Hornpipe</option>
+    <option>Polka</option>
+    <option>Slide</option>
+    <option>Waltz</option>
+    <option>March</option>
+    <option>Barndance</option>
+    <option>Mazurka</option>
+    <option>Strathspey</option>
+    <option>Highland</option>
+    <option>Air</option>
+    <option>Planxty</option>
+    <option>Other</option>
+  </select>
 
-      <button type="button" onclick="createSetWithSongs()">選んだ曲でSETを作成</button>
+  <label>曲を選択</label>
+  <select id="songSelectForSet"></select>
 
-      <hr style="margin:20px 0; border:none; border-top:1px solid #eee;">
+  <button type="button" onclick="addSongToTempSet()">曲を追加</button>
 
-      <h3>既存SETに曲をまとめて追加</h3>
+  <h3>選択した曲</h3>
+  <div id="tempSetList" class="set-box"></div>
 
-      <label>追加先SET</label>
-      <select id="setSelect"></select>
-
-      <label>追加する曲（複数選択）</label>
-      <div id="songChecklistForExistingSet" class="set-box"></div>
-
-      <button type="button" onclick="addCheckedSongsToSelectedSet()">選んだ曲をSETに追加</button>
-    </div>
-  </div>
+  <button type="button" onclick="saveTempSet()">SET登録</button>
+</div>
 
   <div id="tab-setList" class="tab-panel">
     <div class="card">
@@ -1001,7 +1027,8 @@ function renderSets() {
 
 function renderAll() {
   updateSetSelectors();
-  renderSongChecklists();
+  updateSongSelectForSet(); // ←これ
+  renderTempSet();
   renderSongs();
   renderSets();
 }
@@ -1090,6 +1117,28 @@ function editSet(setId) {
   saveSets();
   renderAll();
 }
+function updateSongSelectForSet() {
+  const select = document.getElementById("songSelectForSet");
+  const genre = document.getElementById("genreFilterForSet")?.value || "all";
+
+  if (!select) return;
+
+  let filtered = songs;
+
+  if (genre !== "all") {
+    filtered = songs.filter(song => (song.genre || "Other") === genre);
+  }
+
+  if (filtered.length === 0) {
+    select.innerHTML = `<option value="">該当なし</option>`;
+    return;
+  }
+
+  select.innerHTML = filtered.map(song =>
+    `<option value="${song.id}">${escapeHtml(song.title)}</option>`
+  ).join("");
+}
+  
 renderAll();
 </script>
 </body>
