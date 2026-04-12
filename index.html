@@ -865,7 +865,12 @@ function editSet(setId) {
 
       <label>メモ（参考URLなど）</label>
       <textarea id="editSetMemo">${escapeHtml(set.memo || "")}</textarea>
-
+      
+      <div style="margin-top:12px;">
+        <h3>曲の順番</h3>
+        <div id="editSetSongs"></div>
+      </div>
+      
       <div style="margin-top:12px;">
         <h3>曲を追加</h3>
 
@@ -895,10 +900,7 @@ function editSet(setId) {
         <button type="button" onclick="addSongToExistingSet(${set.id})">このSETに曲を追加</button>
       </div>
 
-      <div style="margin-top:12px;">
-        <h3>曲の順番</h3>
-        <div id="editSetSongs"></div>
-      </div>
+
 
       <div style="margin-top:16px;" class="inline-actions">
         <button onclick="saveSetEdit(${set.id})">保存</button>
