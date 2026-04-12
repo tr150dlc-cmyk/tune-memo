@@ -157,13 +157,76 @@ button.small {
 }
 
 .tag-chip {
-  display: inline-block;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: #eef7ff;
   border: 1px solid #d6ecff;
   color: #4b6b85;
   font-size: 12px;
+}
+
+.tag-chip .remove {
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tag-picker-box {
+  background: #fffefb;
+  border: 1px solid #f1f3f5;
+  border-radius: 14px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.tag-section-title {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tag-suggestion {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f5faff;
+  border: 1px solid #dcefff;
+  color: #4b6b85;
+  font-size: 12px;
+  cursor: pointer;
+  width: auto;
+}
+
+.tag-suggestion.active {
+  background: #dff1ff;
+  border-color: #bcdfff;
+}
+
+.tag-entry-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.tag-entry-row input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.tag-entry-row button {
+  width: auto;
+  white-space: nowrap;
 }
 
 .memo-block {
@@ -270,13 +333,6 @@ button.small {
   color: #b00020;
 }
 
-.tag-input-note {
-  font-size: 12px;
-  color: #777;
-  margin-top: -4px;
-  margin-bottom: 8px;
-}
-
 a {
   color: #339af0;
 }
@@ -300,6 +356,14 @@ a {
 @media (max-width: 720px) {
   .top-tabs {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tag-entry-row {
+    flex-direction: column;
+  }
+
+  .tag-entry-row button {
+    width: 100%;
   }
 }
 </style>
@@ -360,8 +424,7 @@ a {
       <textarea id="memoInput" placeholder="覚書、参考動画URL、Spotifyリンクなど"></textarea>
 
       <label>属性タグ</label>
-      <input id="songTagsInput" list="tagSuggestions" placeholder="例: 京都 field, 西川レッスン, ○○バンド">
-      <div class="tag-input-note">カンマ区切りで複数入力できます。過去に使ったタグは候補に出ます。</div>
+      <div id="songTagEditor" class="tag-picker-box"></div>
 
       <button id="saveButton" type="button" onclick="addOrUpdateSong()">追加</button>
       <button id="cancelEditButton" class="sub" type="button" onclick="cancelEdit()" style="display:none;">編集をやめる</button>
@@ -449,8 +512,7 @@ a {
       <div id="tempSetList" class="set-box"></div>
 
       <label>属性タグ</label>
-      <input id="setTagsInput" list="tagSuggestions" placeholder="例: 京都 field, 西川レッスン, ○○バンド">
-      <div class="tag-input-note">カンマ区切りで複数入力できます。過去に使ったタグは候補に出ます。</div>
+      <div id="setTagEditor" class="tag-picker-box"></div>
 
       <button type="button" onclick="saveTempSet()">SET登録</button>
     </div>
@@ -475,8 +537,6 @@ a {
 
 </div>
 
-<datalist id="tagSuggestions"></datalist>
-
 <script>
 const STORAGE_KEY = "songs";
 const SETS_STORAGE_KEY = "sets";
@@ -491,6 +551,10 @@ let currentSetTagFilter = "all";
 let editingId = null;
 let currentTab = "addSong";
 let tempSetSongs = [];
+
+let songEditorTags = [];
+let setEditorTags = [];
+let editSetEditorTags = [];
 
 songs = songs.map(song => ({
   ...song,
@@ -602,13 +666,12 @@ function linkifyText(text) {
     .replace(/\n/g, "<br>");
 }
 
-function parseTags(input) {
-  return Array.from(new Set(
-    String(input || "")
-      .split(",")
-      .map(s => s.trim())
-      .filter(Boolean)
-  ));
+function normalizeTag(tag) {
+  return String(tag || "").trim();
+}
+
+function uniqueTags(tags) {
+  return Array.from(new Set((tags || []).map(normalizeTag).filter(Boolean)));
 }
 
 function renderTags(tags) {
@@ -643,14 +706,6 @@ function getAllSetTags() {
   )).sort();
 }
 
-function updateTagSuggestions() {
-  const datalist = document.getElementById("tagSuggestions");
-  if (!datalist) return;
-
-  const allTags = getAllTags();
-  datalist.innerHTML = allTags.map(tag => `<option value="${escapeHtml(tag)}"></option>`).join("");
-}
-
 function updateTagFilterOptions() {
   const songTagSelect = document.getElementById("songTagFilterSelect");
   const setTagSelect = document.getElementById("setTagFilterSelect");
@@ -670,6 +725,131 @@ function updateTagFilterOptions() {
       tags.map(tag => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join("");
     setTagSelect.value = tags.includes(currentSetTagFilter) ? currentSetTagFilter : "all";
   }
+}
+
+function renderTagEditor(containerId, selectedTags, addFnName, removeFnName, inputId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const selected = uniqueTags(selectedTags);
+  const suggestions = getAllTags().filter(tag => !selected.includes(tag));
+
+  container.innerHTML = `
+    <div class="tag-section-title">追加済みタグ</div>
+    <div class="tag-list">
+      ${selected.length
+        ? selected.map(tag => `
+            <span class="tag-chip">
+              ${escapeHtml(tag)}
+              <span class="remove" onclick="${removeFnName}('${escapeJs(tag)}')">×</span>
+            </span>
+          `).join("")
+        : `<span class="muted">まだタグがありません</span>`
+      }
+    </div>
+
+    <div style="margin-top:10px;" class="tag-section-title">候補から追加</div>
+    <div class="tag-suggestions">
+      ${suggestions.length
+        ? suggestions.map(tag => `
+            <button type="button" class="tag-suggestion" onclick="${addFnName}('${escapeJs(tag)}')">${escapeHtml(tag)}</button>
+          `).join("")
+        : `<span class="muted">候補なし</span>`
+      }
+    </div>
+
+    <div class="tag-section-title">新しいタグを追加</div>
+    <div class="tag-entry-row">
+      <input id="${inputId}" placeholder="新しいタグ名">
+      <button type="button" onclick="${addFnName}()">追加</button>
+    </div>
+  `;
+}
+
+function escapeJs(str) {
+  return String(str || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+}
+
+function addSongEditorTag(tag) {
+  let value = tag;
+  if (!value) {
+    value = document.getElementById("songTagNewInput")?.value || "";
+  }
+  value = normalizeTag(value);
+  if (!value) return;
+
+  if (!songEditorTags.includes(value)) {
+    songEditorTags.push(value);
+  }
+
+  const input = document.getElementById("songTagNewInput");
+  if (input) input.value = "";
+  renderSongTagEditor();
+}
+
+function removeSongEditorTag(tag) {
+  songEditorTags = songEditorTags.filter(t => t !== tag);
+  renderSongTagEditor();
+}
+
+function renderSongTagEditor() {
+  renderTagEditor("songTagEditor", songEditorTags, "addSongEditorTag", "removeSongEditorTag", "songTagNewInput");
+}
+
+function addSetEditorTag(tag) {
+  let value = tag;
+  if (!value) {
+    value = document.getElementById("setTagNewInput")?.value || "";
+  }
+  value = normalizeTag(value);
+  if (!value) return;
+
+  if (!setEditorTags.includes(value)) {
+    setEditorTags.push(value);
+  }
+
+  const input = document.getElementById("setTagNewInput");
+  if (input) input.value = "";
+  renderSetTagEditor();
+}
+
+function removeSetEditorTag(tag) {
+  setEditorTags = setEditorTags.filter(t => t !== tag);
+  renderSetTagEditor();
+}
+
+function renderSetTagEditor() {
+  renderTagEditor("setTagEditor", setEditorTags, "addSetEditorTag", "removeSetEditorTag", "setTagNewInput");
+}
+
+function addEditSetEditorTag(tag) {
+  let value = tag;
+  if (!value) {
+    value = document.getElementById("editSetTagNewInput")?.value || "";
+  }
+  value = normalizeTag(value);
+  if (!value) return;
+
+  if (!editSetEditorTags.includes(value)) {
+    editSetEditorTags.push(value);
+  }
+
+  const input = document.getElementById("editSetTagNewInput");
+  if (input) input.value = "";
+  renderEditSetTagEditor();
+}
+
+function removeEditSetEditorTag(tag) {
+  editSetEditorTags = editSetEditorTags.filter(t => t !== tag);
+  renderEditSetTagEditor();
+}
+
+function renderEditSetTagEditor() {
+  renderTagEditor("editSetTagEditor", editSetEditorTags, "addEditSetEditorTag", "removeEditSetEditorTag", "editSetTagNewInput");
 }
 
 async function fetchFromSession() {
@@ -743,7 +923,7 @@ async function addOrUpdateSong() {
   const sourceUrl = document.getElementById("urlInput").value.trim();
   const songMemo = document.getElementById("memoInput").value.trim();
   const sessionUrlValue = document.getElementById("sessionUrlInput").value.trim();
-  const songTags = parseTags(document.getElementById("songTagsInput").value);
+  const songTags = uniqueTags(songEditorTags);
 
   if (!songTitle) {
     alert("曲名を入力してください。");
@@ -808,6 +988,7 @@ function startEdit(id) {
   if (!song) return;
 
   editingId = id;
+  songEditorTags = uniqueTags(song.tags || []);
   document.getElementById("formTitle").textContent = "曲を編集";
   document.getElementById("saveButton").textContent = "保存";
   document.getElementById("cancelEditButton").style.display = "block";
@@ -817,8 +998,8 @@ function startEdit(id) {
   document.getElementById("genreInput").value = song.genre || "";
   document.getElementById("urlInput").value = song.url || "";
   document.getElementById("memoInput").value = song.memo || "";
-  document.getElementById("songTagsInput").value = (song.tags || []).join(", ");
 
+  renderSongTagEditor();
   switchTab("addSong");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -911,13 +1092,14 @@ function clearForm() {
   document.getElementById("genreInput").value = "";
   document.getElementById("urlInput").value = "";
   document.getElementById("memoInput").value = "";
-  document.getElementById("songTagsInput").value = "";
   document.getElementById("fetchStatus").textContent = "";
   document.getElementById("fetchStatus").className = "status";
   document.getElementById("formTitle").textContent = "曲を追加";
   document.getElementById("saveButton").textContent = "追加";
   document.getElementById("cancelEditButton").style.display = "none";
   editingId = null;
+  songEditorTags = [];
+  renderSongTagEditor();
 }
 
 function renderSongs() {
@@ -1018,6 +1200,8 @@ function editSet(setId) {
   const set = getSetById(setId);
   if (!set) return;
 
+  editSetEditorTags = uniqueTags(set.tags || []);
+
   const container = document.getElementById("setList");
 
   container.innerHTML = `
@@ -1028,8 +1212,7 @@ function editSet(setId) {
       <textarea id="editSetMemo">${escapeHtml(set.memo || "")}</textarea>
 
       <label>属性タグ</label>
-      <input id="editSetTagsInput" list="tagSuggestions" value="${escapeHtml((set.tags || []).join(", "))}" placeholder="例: 京都 field, 西川レッスン, ○○バンド">
-      <div class="tag-input-note">カンマ区切りで複数入力できます。過去に使ったタグは候補に出ます。</div>
+      <div id="editSetTagEditor" class="tag-picker-box"></div>
 
       <div style="margin-top:12px;">
         <h3>曲を追加</h3>
@@ -1072,6 +1255,7 @@ function editSet(setId) {
     </div>
   `;
 
+  renderEditSetTagEditor();
   updateEditSetSongSelect();
   renderEditSetSongs(set);
 }
@@ -1162,10 +1346,9 @@ function saveSetEdit(setId) {
   if (!set) return;
 
   const memo = document.getElementById("editSetMemo").value;
-  const tags = parseTags(document.getElementById("editSetTagsInput").value);
 
   set.memo = memo;
-  set.tags = tags;
+  set.tags = uniqueTags(editSetEditorTags);
 
   saveSets();
   renderAll();
@@ -1255,7 +1438,7 @@ function removeTempSong(index) {
 
 function saveTempSet() {
   const name = document.getElementById("setNameInput").value.trim();
-  const tags = parseTags(document.getElementById("setTagsInput").value);
+  const tags = uniqueTags(setEditorTags);
 
   if (!name) {
     alert("SET名を入力してください");
@@ -1278,21 +1461,23 @@ function saveTempSet() {
   saveSets();
 
   tempSetSongs = [];
+  setEditorTags = [];
   document.getElementById("setNameInput").value = "";
-  document.getElementById("setTagsInput").value = "";
   renderTempSet();
+  renderSetTagEditor();
 
   renderAll();
   switchTab("setList");
 }
 
 function renderAll() {
-  updateTagSuggestions();
   updateTagFilterOptions();
   updateSongSelectForSet();
   renderTempSet();
   renderSongs();
   renderSets();
+  renderSongTagEditor();
+  renderSetTagEditor();
 }
 
 renderAll();
