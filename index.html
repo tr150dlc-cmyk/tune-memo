@@ -149,6 +149,13 @@ button.small {
   color: #74c69d;
 }
 
+.aliases {
+  font-size: 12px;
+  color: #7d8790;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
 .tag-list {
   display: inline-flex;
   flex-wrap: wrap;
@@ -205,11 +212,6 @@ button.small {
   font-size: 12px;
   cursor: pointer;
   width: auto;
-}
-
-.tag-suggestion.active {
-  background: #dff1ff;
-  border-color: #bcdfff;
 }
 
 .tag-entry-row {
@@ -333,24 +335,12 @@ button.small {
   color: #b00020;
 }
 
+.search-box {
+  margin-bottom: 8px;
+}
+
 a {
   color: #339af0;
-}
-
-#setNameInput {
-  margin-bottom: 12px;
-}
-
-#genreFilterForSet {
-  margin-bottom: 8px;
-}
-
-#songSelectForSet {
-  margin-bottom: 8px;
-}
-
-#tempSetList {
-  min-height: 60px;
 }
 
 @media (max-width: 720px) {
@@ -436,6 +426,11 @@ a {
       <h2>追加した曲の閲覧</h2>
 
       <div class="filter-row">
+        <div class="search-box filter-select">
+          <label>キーワード検索</label>
+          <input id="songSearchInput" placeholder="曲名 / 別名 / メモ / タグ で検索" oninput="setSongSearch(this.value)">
+        </div>
+
         <div>
           <button class="small status-btn" data-status="all" type="button" onclick="setStatus('all')">全部</button>
           <button class="small status-btn" data-status="want" type="button" onclick="setStatus('want')">未習得</button>
@@ -523,6 +518,11 @@ a {
       <h2>SETの閲覧</h2>
 
       <div class="filter-row">
+        <div class="search-box filter-select">
+          <label>キーワード検索</label>
+          <input id="setSearchInput" placeholder="SET名 / メモ / タグ / 曲名 / 曲の別名 で検索" oninput="setSetSearch(this.value)">
+        </div>
+
         <div class="filter-select">
           <label>属性タグ</label>
           <select id="setTagFilterSelect" onchange="setSetTagFilter(this.value)">
@@ -548,6 +548,8 @@ let currentStatusFilter = "all";
 let currentGenreFilter = "all";
 let currentSongTagFilter = "all";
 let currentSetTagFilter = "all";
+let currentSongSearch = "";
+let currentSetSearch = "";
 let editingId = null;
 let currentTab = "addSong";
 let tempSetSongs = [];
@@ -558,7 +560,8 @@ let editSetEditorTags = [];
 
 songs = songs.map(song => ({
   ...song,
-  tags: Array.isArray(song.tags) ? song.tags : []
+  tags: Array.isArray(song.tags) ? song.tags : [],
+  aliases: Array.isArray(song.aliases) ? song.aliases : []
 }));
 
 sets = sets.map(set => ({
@@ -649,6 +652,97 @@ function extractFirstAbc(data) {
   return "";
 }
 
+function normalizeAliasList(values) {
+  return Array.from(new Set(
+    (values || [])
+      .flat()
+      .map(v => String(v || "").trim())
+      .filter(Boolean)
+  ));
+}
+
+function extractAliasesFromJson(data) {
+  if (!data || typeof data !== "object") return [];
+
+  const candidates = [
+    data.also_known_as,
+    data.alsoKnownAs,
+    data.aliases,
+    data.alias,
+    data.aka,
+    data.akAs,
+    data.alternative_titles,
+    data.alternativeTitles,
+    data.alt_titles,
+    data.altTitles,
+    data.other_titles,
+    data.otherTitles,
+    data.names,
+    data.titles
+  ];
+
+  const aliases = [];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) aliases.push(...candidate);
+    else if (typeof candidate === "string") {
+      aliases.push(...candidate.split(/[,;/]|(?:\s{2,})/));
+    }
+  }
+
+  return normalizeAliasList(aliases);
+}
+
+function extractAliasesFromHtml(html) {
+  if (!html) return [];
+
+  const cleaned = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ");
+
+  const match = cleaned.match(/Also known as\s+(.*?)(?:Type|Key|Settings|Recordings|Comments|Learn more|Add to tunebook|$)/i);
+  if (!match) return [];
+
+  const raw = match[1]
+    .replace(/\s+\|\s+/g, ",")
+    .replace(/\s+\/\s+/g, ",")
+    .replace(/\s+;\s+/g, ",")
+    .trim();
+
+  return normalizeAliasList(raw.split(","));
+}
+
+async function fetchAliasesForTune(tuneId) {
+  let aliases = [];
+
+  try {
+    const res = await fetch(`https://thesession.org/tunes/${tuneId}?format=json`);
+    if (res.ok) {
+      const data = await res.json();
+      aliases = extractAliasesFromJson(data);
+    }
+  } catch (e) {
+    console.error("JSON alias fetch failed:", e);
+  }
+
+  if (aliases.length > 0) {
+    return aliases;
+  }
+
+  try {
+    const res = await fetch(`https://thesession.org/tunes/${tuneId}`);
+    if (res.ok) {
+      const html = await res.text();
+      aliases = extractAliasesFromHtml(html);
+    }
+  } catch (e) {
+    console.error("HTML alias fetch failed:", e);
+  }
+
+  return normalizeAliasList(aliases);
+}
+
 function escapeHtml(str) {
   return String(str || "")
     .replace(/&/g, "&amp;")
@@ -677,6 +771,11 @@ function uniqueTags(tags) {
 function renderTags(tags) {
   if (!Array.isArray(tags) || tags.length === 0) return "";
   return `<div class="tag-list">${tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</div>`;
+}
+
+function renderAliases(aliases) {
+  if (!Array.isArray(aliases) || aliases.length === 0) return "";
+  return `<div class="aliases">別名: ${aliases.map(escapeHtml).join(" / ")}</div>`;
 }
 
 function getSongById(id) {
@@ -776,16 +875,10 @@ function escapeJs(str) {
 
 function addSongEditorTag(tag) {
   let value = tag;
-  if (!value) {
-    value = document.getElementById("songTagNewInput")?.value || "";
-  }
+  if (!value) value = document.getElementById("songTagNewInput")?.value || "";
   value = normalizeTag(value);
   if (!value) return;
-
-  if (!songEditorTags.includes(value)) {
-    songEditorTags.push(value);
-  }
-
+  if (!songEditorTags.includes(value)) songEditorTags.push(value);
   const input = document.getElementById("songTagNewInput");
   if (input) input.value = "";
   renderSongTagEditor();
@@ -802,16 +895,10 @@ function renderSongTagEditor() {
 
 function addSetEditorTag(tag) {
   let value = tag;
-  if (!value) {
-    value = document.getElementById("setTagNewInput")?.value || "";
-  }
+  if (!value) value = document.getElementById("setTagNewInput")?.value || "";
   value = normalizeTag(value);
   if (!value) return;
-
-  if (!setEditorTags.includes(value)) {
-    setEditorTags.push(value);
-  }
-
+  if (!setEditorTags.includes(value)) setEditorTags.push(value);
   const input = document.getElementById("setTagNewInput");
   if (input) input.value = "";
   renderSetTagEditor();
@@ -828,16 +915,10 @@ function renderSetTagEditor() {
 
 function addEditSetEditorTag(tag) {
   let value = tag;
-  if (!value) {
-    value = document.getElementById("editSetTagNewInput")?.value || "";
-  }
+  if (!value) value = document.getElementById("editSetTagNewInput")?.value || "";
   value = normalizeTag(value);
   if (!value) return;
-
-  if (!editSetEditorTags.includes(value)) {
-    editSetEditorTags.push(value);
-  }
-
+  if (!editSetEditorTags.includes(value)) editSetEditorTags.push(value);
   const input = document.getElementById("editSetTagNewInput");
   if (input) input.value = "";
   renderEditSetTagEditor();
@@ -873,13 +954,15 @@ async function fetchFromSession() {
     if (!res.ok) throw new Error("取得失敗");
 
     const data = await res.json();
+    const aliases = await fetchAliasesForTune(tuneId);
 
     document.getElementById("titleInput").value = data.name || data.title || "";
     document.getElementById("genreInput").value = normalizeGenre(data.type);
     document.getElementById("urlInput").value = sessionUrl;
 
+    const statusExtra = aliases.length ? ` / 別名 ${aliases.length} 件取得` : "";
     statusEl.classList.add("ok");
-    statusEl.textContent = "曲名とジャンルを自動入力しました。";
+    statusEl.textContent = `曲名とジャンルを自動入力しました${statusExtra}。`;
   } catch (e) {
     console.error(e);
     document.getElementById("urlInput").value = sessionUrl;
@@ -906,6 +989,8 @@ async function loadABC(song) {
     if (!song.title) {
       song.title = data.name || data.title || song.title;
     }
+
+    song.aliases = await fetchAliasesForTune(tuneId);
 
     const abc = extractFirstAbc(data);
     song.abc = cleanAbc(abc, song.title);
@@ -943,7 +1028,8 @@ async function addOrUpdateSong() {
             url: sourceUrl,
             memo: songMemo,
             tags: songTags,
-            abc: oldUrl !== sourceUrl ? "" : song.abc
+            abc: oldUrl !== sourceUrl ? "" : song.abc,
+            aliases: oldUrl !== sourceUrl ? [] : (song.aliases || [])
           }
         : song
     );
@@ -955,7 +1041,7 @@ async function addOrUpdateSong() {
     switchTab("songList");
 
     const updatedSong = songs.find(song => song.id === updatedId);
-    if (updatedSong && sourceUrl && oldUrl !== sourceUrl) {
+    if (updatedSong && sourceUrl) {
       await loadABC(updatedSong);
     }
     return;
@@ -969,7 +1055,8 @@ async function addOrUpdateSong() {
     memo: songMemo,
     done: false,
     abc: "",
-    tags: songTags
+    tags: songTags,
+    aliases: []
   };
 
   songs.unshift(song);
@@ -1030,6 +1117,16 @@ function setSetTagFilter(value) {
   renderSets();
 }
 
+function setSongSearch(value) {
+  currentSongSearch = String(value || "").trim().toLowerCase();
+  renderSongs();
+}
+
+function setSetSearch(value) {
+  currentSetSearch = String(value || "").trim().toLowerCase();
+  renderSets();
+}
+
 function updateStatusButtons() {
   document.querySelectorAll(".status-btn").forEach(btn => {
     btn.classList.remove("active");
@@ -1054,15 +1151,50 @@ function filteredSongs() {
       currentSongTagFilter === "all" ||
       (Array.isArray(song.tags) && song.tags.includes(currentSongTagFilter));
 
-    return statusOk && genreOk && tagOk;
+    const haystack = [
+      song.title,
+      ...(song.aliases || []),
+      song.genre,
+      song.memo,
+      ...(song.tags || [])
+    ].join(" ").toLowerCase();
+
+    const searchOk =
+      !currentSongSearch || haystack.includes(currentSongSearch);
+
+    return statusOk && genreOk && tagOk && searchOk;
   });
 }
 
 function filteredSets() {
-  return sets.filter(set =>
-    currentSetTagFilter === "all" ||
-    (Array.isArray(set.tags) && set.tags.includes(currentSetTagFilter))
-  );
+  return sets.filter(set => {
+    const tagOk =
+      currentSetTagFilter === "all" ||
+      (Array.isArray(set.tags) && set.tags.includes(currentSetTagFilter));
+
+    const songText = (set.songIds || [])
+      .map(songId => {
+        const song = getSongById(songId);
+        if (!song) return "";
+        return [
+          song.title,
+          ...(song.aliases || [])
+        ].join(" ");
+      })
+      .join(" ");
+
+    const haystack = [
+      set.name,
+      set.memo,
+      ...(set.tags || []),
+      songText
+    ].join(" ").toLowerCase();
+
+    const searchOk =
+      !currentSetSearch || haystack.includes(currentSetSearch);
+
+    return tagOk && searchOk;
+  });
 }
 
 function toggleDone(id) {
@@ -1121,6 +1253,7 @@ function renderSongs() {
         ${renderTags(song.tags)}
       </div>
 
+      ${renderAliases(song.aliases)}
       <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
       <div id="abc-${song.id}" class="notation"></div>
       ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
