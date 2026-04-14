@@ -279,6 +279,10 @@ button.small {
   padding: 12px;
 }
 
+.custom-set-item {
+  margin-bottom: 10px;
+}
+
 .empty-box {
   background: #fff;
   border: 1px dashed #ddd;
@@ -350,6 +354,12 @@ button.small {
 
 .search-box {
   margin-bottom: 8px;
+}
+
+.section-divider {
+  margin: 16px 0;
+  border: none;
+  border-top: 1px solid #eee;
 }
 
 a {
@@ -491,6 +501,8 @@ a {
       <label>SET名</label>
       <input id="setNameInput" placeholder="例: Reel Set 1">
 
+      <h3>登録済みの曲から追加</h3>
+
       <label>ジャンルで絞り込み</label>
       <select id="genreFilterForSet" onchange="updateSongSelectForSet()">
         <option value="all">ALL</option>
@@ -513,8 +525,19 @@ a {
 
       <label>曲を選択</label>
       <select id="songSelectForSet"></select>
+      <button type="button" onclick="addSongToTempSet()">既存曲を追加</button>
 
-      <button type="button" onclick="addSongToTempSet()">曲を追加</button>
+      <hr class="section-divider">
+
+      <h3>直接入力で追加</h3>
+
+      <label>曲名</label>
+      <input id="customSetSongTitle" placeholder="曲名を入力">
+
+      <label>メモ</label>
+      <textarea id="customSetSongMemo" placeholder="このSET内だけのメモ"></textarea>
+
+      <button type="button" onclick="addCustomSongToTempSet()">直接入力の曲を追加</button>
 
       <h3>選択した曲</h3>
       <div id="tempSetList" class="set-box"></div>
@@ -565,7 +588,7 @@ let currentSongSearch = "";
 let currentSetSearch = "";
 let editingId = null;
 let currentTab = "addSong";
-let tempSetSongs = [];
+let tempSetItems = [];
 let openSetSongDetailId = null;
 let focusedSongId = null;
 
@@ -582,7 +605,12 @@ songs = songs.map(song => ({
 sets = sets.map(set => ({
   ...set,
   memo: set.memo || "",
-  tags: Array.isArray(set.tags) ? set.tags : []
+  tags: Array.isArray(set.tags) ? set.tags : [],
+  items: Array.isArray(set.items)
+    ? set.items
+    : Array.isArray(set.songIds)
+      ? set.songIds.map(songId => ({ type: "song", songId }))
+      : []
 }));
 
 function switchTab(tabName) {
@@ -1137,6 +1165,7 @@ function setSetTagFilter(value) {
 
 function setSongSearch(value) {
   currentSongSearch = String(value || "").trim().toLowerCase();
+  focusedSongId = null;
   renderSongs();
 }
 
@@ -1190,11 +1219,15 @@ function filteredSets() {
       currentSetTagFilter === "all" ||
       (Array.isArray(set.tags) && set.tags.includes(currentSetTagFilter));
 
-    const songText = (set.songIds || [])
-      .map(songId => {
-        const song = getSongById(songId);
-        if (!song) return "";
-        return [song.title, ...(song.aliases || [])].join(" ");
+    const itemText = (set.items || [])
+      .map(item => {
+        if (item.type === "song") {
+          const song = getSongById(item.songId);
+          if (!song) return "";
+          return [song.title, ...(song.aliases || [])].join(" ");
+        } else {
+          return [item.title || "", item.memo || ""].join(" ");
+        }
       })
       .join(" ");
 
@@ -1202,7 +1235,7 @@ function filteredSets() {
       set.name,
       set.memo,
       ...(set.tags || []),
-      songText
+      itemText
     ].join(" ").toLowerCase();
 
     const searchOk =
@@ -1226,7 +1259,7 @@ function delSong(id) {
   songs = songs.filter(song => song.id !== id);
   sets = sets.map(set => ({
     ...set,
-    songIds: set.songIds.filter(songId => songId !== id)
+    items: (set.items || []).filter(item => !(item.type === "song" && item.songId === id))
   }));
 
   saveAll();
@@ -1251,6 +1284,10 @@ function clearForm() {
 
 function openSongFromSet(songId) {
   focusedSongId = songId;
+  currentSongSearch = "";
+  const searchInput = document.getElementById("songSearchInput");
+  if (searchInput) searchInput.value = "";
+
   switchTab("songList");
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === "songList");
@@ -1260,6 +1297,7 @@ function openSongFromSet(songId) {
   });
   const panel = document.getElementById("tab-songList");
   if (panel) panel.classList.add("active");
+
   renderSongs();
 
   setTimeout(() => {
@@ -1270,8 +1308,8 @@ function openSongFromSet(songId) {
   }, 50);
 }
 
-function toggleSetSongDetail(songId) {
-  openSetSongDetailId = openSetSongDetailId === songId ? null : songId;
+function toggleSetSongDetail(detailKey, songId) {
+  openSetSongDetailId = openSetSongDetailId === detailKey ? null : detailKey;
   renderSets();
 
   if (openSetSongDetailId !== null) {
@@ -1279,7 +1317,7 @@ function toggleSetSongDetail(songId) {
       const song = getSongById(songId);
       if (song && song.abc) {
         try {
-          ABCJS.renderAbc(`set-detail-abc-${songId}`, song.abc, {
+          ABCJS.renderAbc(`set-detail-abc-${detailKey}`, song.abc, {
             responsive: "resize",
             add_classes: true,
             staffwidth: 680
@@ -1358,27 +1396,39 @@ function renderSets() {
   }
 
   setList.innerHTML = items.map(set => {
-    const songsHtml = set.songIds.map(songId => {
-      const song = getSongById(songId);
-      if (!song) return "";
+    const setItems = Array.isArray(set.items) ? set.items : [];
 
-      const isOpen = openSetSongDetailId === song.id;
+    const songsHtml = setItems.map((item, idx) => {
+      if (item.type === "song") {
+        const song = getSongById(item.songId);
+        if (!song) return "";
+
+        const detailKey = `song-${set.id}-${idx}`;
+        const isOpen = openSetSongDetailId === detailKey;
+
+        return `
+          <div class="meta">
+            <a class="set-song-link" href="javascript:void(0)" onclick="toggleSetSongDetail('${detailKey}', ${song.id})">${escapeHtml(song.title)}</a>
+          </div>
+
+          ${isOpen ? `
+            <div class="set-song-detail-panel">
+              <div class="title" style="font-size:16px;">${escapeHtml(song.title)}</div>
+              <div id="set-detail-abc-${detailKey}" class="notation"></div>
+              <div class="inline-actions">
+                <button class="small" type="button" onclick="openSongFromSet(${song.id})">曲一覧で開く</button>
+                <button class="small sub" type="button" onclick="toggleSetSongDetail('${detailKey}', ${song.id})">閉じる</button>
+              </div>
+            </div>
+          ` : ""}
+        `;
+      }
 
       return `
-        <div class="meta">
-          <a class="set-song-link" href="javascript:void(0)" onclick="toggleSetSongDetail(${song.id})">${escapeHtml(song.title)}</a>
+        <div class="custom-set-item">
+          <div class="meta">${escapeHtml(item.title || "")}</div>
+          ${item.memo ? `<div class="memo-block" style="margin-top:4px;">${linkifyText(item.memo)}</div>` : ""}
         </div>
-
-        ${isOpen ? `
-          <div class="set-song-detail-panel">
-            <div class="title" style="font-size:16px;">${escapeHtml(song.title)}</div>
-            <div id="set-detail-abc-${song.id}" class="notation"></div>
-            <div class="inline-actions">
-              <button class="small" type="button" onclick="openSongFromSet(${song.id})">曲一覧で開く</button>
-              <button class="small sub" type="button" onclick="toggleSetSongDetail(${song.id})">閉じる</button>
-            </div>
-          </div>
-        ` : ""}
       `;
     }).join("");
 
@@ -1426,7 +1476,7 @@ function editSet(setId) {
       <div id="editSetTagEditor" class="tag-picker-box"></div>
 
       <div style="margin-top:12px;">
-        <h3>曲を追加</h3>
+        <h3>既存の曲を追加</h3>
 
         <label>ジャンルで絞り込み</label>
         <select id="editSetGenreFilter" onchange="updateEditSetSongSelect()">
@@ -1451,7 +1501,19 @@ function editSet(setId) {
         <label>追加する曲</label>
         <select id="editSetSongSelect"></select>
 
-        <button type="button" onclick="addSongToExistingSet(${set.id})">このSETに曲を追加</button>
+        <button type="button" onclick="addSongToExistingSet(${set.id})">このSETに既存曲を追加</button>
+      </div>
+
+      <div style="margin-top:12px;">
+        <h3>直接入力で追加</h3>
+
+        <label>曲名</label>
+        <input id="editCustomSetSongTitle" placeholder="曲名を入力">
+
+        <label>メモ</label>
+        <textarea id="editCustomSetSongMemo" placeholder="このSET内だけのメモ"></textarea>
+
+        <button type="button" onclick="addCustomSongToExistingSet(${set.id})">このSETに直接入力の曲を追加</button>
       </div>
 
       <div style="margin-top:12px;">
@@ -1502,7 +1564,40 @@ function addSongToExistingSet(setId) {
 
   if (!songId) return;
 
-  set.songIds.push(songId);
+  if (!Array.isArray(set.items)) set.items = [];
+
+  set.items.push({
+    type: "song",
+    songId
+  });
+
+  saveSets();
+  renderEditSetSongs(set);
+}
+
+function addCustomSongToExistingSet(setId) {
+  const set = getSetById(setId);
+  if (!set) return;
+
+  const title = document.getElementById("editCustomSetSongTitle").value.trim();
+  const memo = document.getElementById("editCustomSetSongMemo").value.trim();
+
+  if (!title) {
+    alert("曲名を入力してください");
+    return;
+  }
+
+  if (!Array.isArray(set.items)) set.items = [];
+
+  set.items.push({
+    type: "custom",
+    title,
+    memo
+  });
+
+  document.getElementById("editCustomSetSongTitle").value = "";
+  document.getElementById("editCustomSetSongMemo").value = "";
+
   saveSets();
   renderEditSetSongs(set);
 }
@@ -1511,13 +1606,26 @@ function renderEditSetSongs(set) {
   const box = document.getElementById("editSetSongs");
   if (!box) return;
 
-  box.innerHTML = set.songIds.map((songId, index) => {
-    const song = getSongById(songId);
-    if (!song) return "";
+  const items = Array.isArray(set.items) ? set.items : [];
+
+  box.innerHTML = items.map((item, index) => {
+    let title = "";
+    let sub = "";
+
+    if (item.type === "song") {
+      const song = getSongById(item.songId);
+      if (!song) return "";
+      title = song.title;
+      sub = "既存曲";
+    } else {
+      title = item.title || "";
+      sub = item.memo ? `メモ: ${escapeHtml(item.memo)}` : "直接入力";
+    }
 
     return `
       <div class="set-song-row">
-        <div>${index + 1}. ${escapeHtml(song.title)}</div>
+        <div><strong>${index + 1}. ${escapeHtml(title)}</strong></div>
+        <div class="meta">${sub}</div>
         <div class="inline-actions">
           <button class="small" onclick="moveSongInSet(${set.id}, ${index}, -1)">↑</button>
           <button class="small" onclick="moveSongInSet(${set.id}, ${index}, 1)">↓</button>
@@ -1530,14 +1638,14 @@ function renderEditSetSongs(set) {
 
 function moveSongInSet(setId, index, direction) {
   const set = getSetById(setId);
-  if (!set) return;
+  if (!set || !Array.isArray(set.items)) return;
 
   const newIndex = index + direction;
-  if (newIndex < 0 || newIndex >= set.songIds.length) return;
+  if (newIndex < 0 || newIndex >= set.items.length) return;
 
-  const temp = set.songIds[index];
-  set.songIds[index] = set.songIds[newIndex];
-  set.songIds[newIndex] = temp;
+  const temp = set.items[index];
+  set.items[index] = set.items[newIndex];
+  set.items[newIndex] = temp;
 
   saveSets();
   renderEditSetSongs(set);
@@ -1545,9 +1653,9 @@ function moveSongInSet(setId, index, direction) {
 
 function removeSongFromSet(setId, index) {
   const set = getSetById(setId);
-  if (!set) return;
+  if (!set || !Array.isArray(set.items)) return;
 
-  set.songIds.splice(index, 1);
+  set.items.splice(index, 1);
   saveSets();
   renderEditSetSongs(set);
 }
@@ -1600,7 +1708,32 @@ function addSongToTempSet() {
 
   if (!songId) return;
 
-  tempSetSongs.push(songId);
+  tempSetItems.push({
+    type: "song",
+    songId
+  });
+
+  renderTempSet();
+}
+
+function addCustomSongToTempSet() {
+  const title = document.getElementById("customSetSongTitle").value.trim();
+  const memo = document.getElementById("customSetSongMemo").value.trim();
+
+  if (!title) {
+    alert("曲名を入力してください");
+    return;
+  }
+
+  tempSetItems.push({
+    type: "custom",
+    title,
+    memo
+  });
+
+  document.getElementById("customSetSongTitle").value = "";
+  document.getElementById("customSetSongMemo").value = "";
+
   renderTempSet();
 }
 
@@ -1609,18 +1742,29 @@ function renderTempSet() {
 
   if (!box) return;
 
-  if (tempSetSongs.length === 0) {
+  if (tempSetItems.length === 0) {
     box.innerHTML = `<div class="muted">まだ曲がありません</div>`;
     return;
   }
 
-  box.innerHTML = tempSetSongs.map((songId, index) => {
-    const song = getSongById(songId);
-    if (!song) return "";
+  box.innerHTML = tempSetItems.map((item, index) => {
+    let title = "";
+    let sub = "";
+
+    if (item.type === "song") {
+      const song = getSongById(item.songId);
+      if (!song) return "";
+      title = song.title;
+      sub = "既存曲";
+    } else {
+      title = item.title || "";
+      sub = item.memo ? `メモ: ${escapeHtml(item.memo)}` : "直接入力";
+    }
 
     return `
       <div class="set-song-row">
-        <div>${index + 1}. ${escapeHtml(song.title)}</div>
+        <div><strong>${index + 1}. ${escapeHtml(title)}</strong></div>
+        <div class="meta">${sub}</div>
         <div class="inline-actions">
           <button class="small" onclick="moveTempSong(${index}, -1)">↑</button>
           <button class="small" onclick="moveTempSong(${index}, 1)">↓</button>
@@ -1633,17 +1777,17 @@ function renderTempSet() {
 
 function moveTempSong(index, direction) {
   const newIndex = index + direction;
-  if (newIndex < 0 || newIndex >= tempSetSongs.length) return;
+  if (newIndex < 0 || newIndex >= tempSetItems.length) return;
 
-  const temp = tempSetSongs[index];
-  tempSetSongs[index] = tempSetSongs[newIndex];
-  tempSetSongs[newIndex] = temp;
+  const temp = tempSetItems[index];
+  tempSetItems[index] = tempSetItems[newIndex];
+  tempSetItems[newIndex] = temp;
 
   renderTempSet();
 }
 
 function removeTempSong(index) {
-  tempSetSongs.splice(index, 1);
+  tempSetItems.splice(index, 1);
   renderTempSet();
 }
 
@@ -1656,7 +1800,7 @@ function saveTempSet() {
     return;
   }
 
-  if (tempSetSongs.length === 0) {
+  if (tempSetItems.length === 0) {
     alert("曲を追加してください");
     return;
   }
@@ -1664,16 +1808,19 @@ function saveTempSet() {
   sets.unshift({
     id: Date.now(),
     name,
-    songIds: [...tempSetSongs],
+    items: [...tempSetItems],
     memo: "",
     tags
   });
 
   saveSets();
 
-  tempSetSongs = [];
+  tempSetItems = [];
   setEditorTags = [];
   document.getElementById("setNameInput").value = "";
+  document.getElementById("customSetSongTitle").value = "";
+  document.getElementById("customSetSongMemo").value = "";
+
   renderTempSet();
   renderSetTagEditor();
 
