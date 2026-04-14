@@ -266,6 +266,19 @@ button.small {
   margin-top: 8px;
 }
 
+.set-song-link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.set-song-detail-panel {
+  margin: 8px 0 12px 0;
+  background: #ffffff;
+  border: 1px solid #e3edf7;
+  border-radius: 14px;
+  padding: 12px;
+}
+
 .empty-box {
   background: #fff;
   border: 1px dashed #ddd;
@@ -553,6 +566,8 @@ let currentSetSearch = "";
 let editingId = null;
 let currentTab = "addSong";
 let tempSetSongs = [];
+let openSetSongDetailId = null;
+let focusedSongId = null;
 
 let songEditorTags = [];
 let setEditorTags = [];
@@ -572,6 +587,13 @@ sets = sets.map(set => ({
 
 function switchTab(tabName) {
   currentTab = tabName;
+
+  if (tabName !== "songList") {
+    focusedSongId = null;
+  }
+  if (tabName !== "setList") {
+    openSetSongDetailId = null;
+  }
 
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === tabName);
@@ -684,9 +706,7 @@ function extractAliasesFromJson(data) {
   const aliases = [];
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) aliases.push(...candidate);
-    else if (typeof candidate === "string") {
-      aliases.push(...candidate.split(/[,;/]|(?:\s{2,})/));
-    }
+    else if (typeof candidate === "string") aliases.push(...candidate.split(/[,;/]|(?:\s{2,})/));
   }
 
   return normalizeAliasList(aliases);
@@ -726,9 +746,7 @@ async function fetchAliasesForTune(tuneId) {
     console.error("JSON alias fetch failed:", e);
   }
 
-  if (aliases.length > 0) {
-    return aliases;
-  }
+  if (aliases.length > 0) return aliases;
 
   try {
     const res = await fetch(`https://thesession.org/tunes/${tuneId}`);
@@ -1176,10 +1194,7 @@ function filteredSets() {
       .map(songId => {
         const song = getSongById(songId);
         if (!song) return "";
-        return [
-          song.title,
-          ...(song.aliases || [])
-        ].join(" ");
+        return [song.title, ...(song.aliases || [])].join(" ");
       })
       .join(" ");
 
@@ -1234,9 +1249,54 @@ function clearForm() {
   renderSongTagEditor();
 }
 
+function openSongFromSet(songId) {
+  focusedSongId = songId;
+  switchTab("songList");
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === "songList");
+  });
+  document.querySelectorAll(".tab-panel").forEach(panel => {
+    panel.classList.remove("active");
+  });
+  const panel = document.getElementById("tab-songList");
+  if (panel) panel.classList.add("active");
+  renderSongs();
+
+  setTimeout(() => {
+    const el = document.getElementById(`song-item-${songId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, 50);
+}
+
+function toggleSetSongDetail(songId) {
+  openSetSongDetailId = openSetSongDetailId === songId ? null : songId;
+  renderSets();
+
+  if (openSetSongDetailId !== null) {
+    setTimeout(() => {
+      const song = getSongById(songId);
+      if (song && song.abc) {
+        try {
+          ABCJS.renderAbc(`set-detail-abc-${songId}`, song.abc, {
+            responsive: "resize",
+            add_classes: true,
+            staffwidth: 680
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }, 0);
+  }
+}
+
 function renderSongs() {
   const list = document.getElementById("list");
-  const items = filteredSongs();
+  const items = filteredSongs().filter(song =>
+    focusedSongId === null || song.id === focusedSongId
+  );
 
   if (!list) return;
 
@@ -1247,7 +1307,7 @@ function renderSongs() {
   }
 
   list.innerHTML = items.map(song => `
-    <div class="song-item ${song.done ? 'done' : ''}">
+    <div id="song-item-${song.id}" class="song-item ${song.done ? 'done' : ''}">
       <div class="title-row">
         <div class="title">${escapeHtml(song.title)}</div>
         ${renderTags(song.tags)}
@@ -1301,7 +1361,25 @@ function renderSets() {
     const songsHtml = set.songIds.map(songId => {
       const song = getSongById(songId);
       if (!song) return "";
-      return `<div class="meta">${escapeHtml(song.title)}</div>`;
+
+      const isOpen = openSetSongDetailId === song.id;
+
+      return `
+        <div class="meta">
+          <a class="set-song-link" href="javascript:void(0)" onclick="toggleSetSongDetail(${song.id})">${escapeHtml(song.title)}</a>
+        </div>
+
+        ${isOpen ? `
+          <div class="set-song-detail-panel">
+            <div class="title" style="font-size:16px;">${escapeHtml(song.title)}</div>
+            <div id="set-detail-abc-${song.id}" class="notation"></div>
+            <div class="inline-actions">
+              <button class="small" type="button" onclick="openSongFromSet(${song.id})">曲一覧で開く</button>
+              <button class="small sub" type="button" onclick="toggleSetSongDetail(${song.id})">閉じる</button>
+            </div>
+          </div>
+        ` : ""}
+      `;
     }).join("");
 
     return `
