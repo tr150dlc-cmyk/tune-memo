@@ -577,8 +577,20 @@ a {
 const STORAGE_KEY = "songs";
 const SETS_STORAGE_KEY = "sets";
 
-let songs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-let sets = JSON.parse(localStorage.getItem(SETS_STORAGE_KEY)) || [];
+function safeLoad(key, fallback = []) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch (e) {
+    console.error(`Failed to parse localStorage key: ${key}`, e);
+    return fallback;
+  }
+}
+
+let songs = safeLoad(STORAGE_KEY, []);
+let sets = safeLoad(SETS_STORAGE_KEY, []);
 
 let currentStatusFilter = "all";
 let currentGenreFilter = "all";
@@ -591,6 +603,7 @@ let currentTab = "addSong";
 let tempSetItems = [];
 let openSetSongDetailId = null;
 let focusedSongId = null;
+let fetchedAliases = [];
 
 let songEditorTags = [];
 let setEditorTags = [];
@@ -633,6 +646,12 @@ function switchTab(tabName) {
 
   const panel = document.getElementById("tab-" + tabName);
   if (panel) panel.classList.add("active");
+
+  if (tabName === "createSet") {
+    updateSongSelectForSet();
+    renderTempSet();
+    renderSetTagEditor();
+  }
 }
 
 function saveSongs() {
@@ -986,6 +1005,7 @@ async function fetchFromSession() {
 
   statusEl.className = "status";
   statusEl.textContent = "";
+  fetchedAliases = [];
 
   if (!sessionUrl || !tuneId) {
     statusEl.classList.add("err");
@@ -1001,6 +1021,7 @@ async function fetchFromSession() {
 
     const data = await res.json();
     const aliases = await fetchAliasesForTune(tuneId);
+    fetchedAliases = aliases;
 
     document.getElementById("titleInput").value = data.name || data.title || "";
     document.getElementById("genreInput").value = normalizeGenre(data.type);
@@ -1075,7 +1096,7 @@ async function addOrUpdateSong() {
             memo: songMemo,
             tags: songTags,
             abc: oldUrl !== sourceUrl ? "" : song.abc,
-            aliases: oldUrl !== sourceUrl ? [] : (song.aliases || [])
+            aliases: oldUrl !== sourceUrl ? [...fetchedAliases] : (song.aliases || [])
           }
         : song
     );
@@ -1102,7 +1123,7 @@ async function addOrUpdateSong() {
     done: false,
     abc: "",
     tags: songTags,
-    aliases: []
+    aliases: [...fetchedAliases]
   };
 
   songs.unshift(song);
@@ -1122,6 +1143,7 @@ function startEdit(id) {
 
   editingId = id;
   songEditorTags = uniqueTags(song.tags || []);
+  fetchedAliases = Array.isArray(song.aliases) ? [...song.aliases] : [];
   document.getElementById("formTitle").textContent = "曲を編集";
   document.getElementById("saveButton").textContent = "保存";
   document.getElementById("cancelEditButton").style.display = "block";
@@ -1278,6 +1300,7 @@ function clearForm() {
   document.getElementById("saveButton").textContent = "追加";
   document.getElementById("cancelEditButton").style.display = "none";
   editingId = null;
+  fetchedAliases = [];
   songEditorTags = [];
   renderSongTagEditor();
 }
@@ -1528,9 +1551,11 @@ function editSet(setId) {
     </div>
   `;
 
-  renderEditSetTagEditor();
-  updateEditSetSongSelect();
-  renderEditSetSongs(set);
+  setTimeout(() => {
+    renderEditSetTagEditor();
+    updateEditSetSongSelect();
+    renderEditSetSongs(set);
+  }, 0);
 }
 
 function updateEditSetSongSelect() {
