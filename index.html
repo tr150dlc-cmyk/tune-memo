@@ -46,6 +46,11 @@ h1 {
   font-weight: 600;
 }
 
+h3 {
+  color: #667085;
+  margin-top: 18px;
+}
+
 input, select, textarea {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -92,7 +97,7 @@ button.small {
 
 .top-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -372,11 +377,38 @@ a {
   color: #fff;
 }
 
-@media (max-width: 720px) {
+.share-area {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.info-box {
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 12px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.import-result {
+  white-space: pre-wrap;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 60px;
+}
+
+@media (max-width: 900px) {
   .top-tabs {
     grid-template-columns: repeat(2, 1fr);
   }
+}
 
+@media (max-width: 720px) {
   .tag-entry-row {
     flex-direction: column;
   }
@@ -442,6 +474,11 @@ a {
   background: #b7efc5;
   color: #2f6f46;
 }
+
+.tab-btn[data-tab="share"].active {
+  background: #ffd8a8;
+  color: #9a5b00;
+}
 </style>
 </head>
 
@@ -450,7 +487,7 @@ a {
 
   <div class="card">
     <h1>曲管理アプリ</h1>
-    <div class="muted">曲追加・曲一覧・SET作成・SET一覧を分けたタブUIです。</div>
+    <div class="muted">曲追加・曲一覧・SET作成・SET一覧・共有を分けたタブUIです。</div>
   </div>
 
   <div class="top-tabs">
@@ -458,6 +495,7 @@ a {
     <button class="tab-btn" data-tab="songList" onclick="switchTab('songList')">曲一覧</button>
     <button class="tab-btn" data-tab="createSet" onclick="switchTab('createSet')">SET作成</button>
     <button class="tab-btn" data-tab="setList" onclick="switchTab('setList')">SET一覧</button>
+    <button class="tab-btn" data-tab="share" onclick="switchTab('share')">共有</button>
   </div>
 
   <div id="tab-addSong" class="tab-panel active">
@@ -636,6 +674,39 @@ a {
     </div>
   </div>
 
+  <!-- 共有 -->
+  <div id="tab-share" class="tab-panel">
+    <div class="card">
+      <h2>共有 / 取り込み</h2>
+
+      <div class="info-box">
+        曲カード共有は1曲だけ、SET共有は必要な曲をまとめて同梱します。<br>
+        取り込み時は <strong>同URLの曲があれば既存曲を使い、なければ新規追加</strong> します。<br>
+        SET名が重複する場合は <strong>(2)</strong> のように自動で連番を付けます。<br>
+        習得状態は共有せず、取り込み側では未習得になります。
+      </div>
+
+      <h3>共有コードを貼り付けて取り込み</h3>
+      <textarea id="importInput" placeholder="ここに共有コードを貼り付け"></textarea>
+      <div class="inline-actions">
+        <button type="button" onclick="importSharedData()">取り込む</button>
+        <button type="button" class="sub" onclick="clearImportArea()">クリア</button>
+      </div>
+
+      <h3>取り込み結果</h3>
+      <div id="importResult" class="import-result muted">まだ取り込みしていません。</div>
+
+      <hr class="section-divider">
+
+      <h3>最後に作成した共有コード</h3>
+      <textarea id="shareOutput" readonly placeholder="曲やSETの『共有』ボタンを押すとここに表示されます"></textarea>
+      <div class="inline-actions">
+        <button type="button" onclick="copyShareOutput()">共有コードをコピー</button>
+        <button type="button" class="sub" onclick="clearShareOutput()">表示をクリア</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -677,7 +748,11 @@ let editSetEditorTags = [];
 songs = songs.map(song => ({
   ...song,
   tags: Array.isArray(song.tags) ? song.tags : [],
-  aliases: Array.isArray(song.aliases) ? song.aliases : []
+  aliases: Array.isArray(song.aliases) ? song.aliases : [],
+  memo: song.memo || "",
+  genre: song.genre || "Other",
+  done: !!song.done,
+  abc: song.abc || ""
 }));
 
 sets = sets.map(set => ({
@@ -1441,6 +1516,7 @@ function renderSongs() {
           ${song.done ? "未習得に戻す" : "習得にする"}
         </button>
         <button class="small" type="button" onclick="startEdit(${song.id})">編集</button>
+        <button class="small" type="button" onclick="shareSong(${song.id})">共有</button>
         <button class="small sub" type="button" onclick="delSong(${song.id})">削除</button>
       </div>
     </div>
@@ -1529,6 +1605,7 @@ function renderSets() {
 
         <div class="inline-actions">
           <button class="small" type="button" onclick="editSet(${set.id})">編集</button>
+          <button class="small" type="button" onclick="shareSet(${set.id})">共有</button>
           <button class="small sub" type="button" onclick="deleteSet(${set.id})">削除</button>
         </div>
       </div>
@@ -1908,6 +1985,297 @@ function saveTempSet() {
   renderAll();
   switchTab("setList");
 }
+
+/* ===== 共有機能 ===== */
+
+function makeSongSharePayload(song) {
+  return {
+    type: "irish-tune-card",
+    version: 1,
+    song: {
+      title: song.title || "",
+      genre: song.genre || "Other",
+      url: song.url || "",
+      memo: song.memo || "",
+      tags: Array.isArray(song.tags) ? [...song.tags] : [],
+      aliases: Array.isArray(song.aliases) ? [...song.aliases] : []
+    }
+  };
+}
+
+function toShareCode(payload) {
+  return JSON.stringify(payload, null, 2);
+}
+
+function setShareOutput(text) {
+  const output = document.getElementById("shareOutput");
+  if (output) output.value = text;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}
+
+async function shareSong(songId) {
+  const song = getSongById(songId);
+  if (!song) return;
+
+  const code = toShareCode(makeSongSharePayload(song));
+  setShareOutput(code);
+  switchTab("share");
+
+  const ok = await copyText(code);
+  alert(ok ? "曲カード共有コードをコピーしました。" : "共有コードを表示しました。必要なら手動でコピーしてください。");
+}
+
+function sanitizeImportedSongData(songData) {
+  return {
+    title: String(songData?.title || "").trim(),
+    genre: normalizeGenre(songData?.genre || "Other"),
+    url: String(songData?.url || "").trim(),
+    memo: String(songData?.memo || "").trim(),
+    tags: uniqueTags(songData?.tags || []),
+    aliases: normalizeAliasList(songData?.aliases || []),
+    done: false,
+    abc: ""
+  };
+}
+
+function findExistingSongByUrl(url) {
+  const normalized = String(url || "").trim();
+  if (!normalized) return null;
+  return songs.find(song => String(song.url || "").trim() === normalized) || null;
+}
+
+function addImportedSong(songData) {
+  const clean = sanitizeImportedSongData(songData);
+
+  if (!clean.title) return { action: "skip", reason: "title empty", song: null };
+
+  const existing = clean.url ? findExistingSongByUrl(clean.url) : null;
+  if (existing) {
+    return { action: "reuse", song: existing };
+  }
+
+  const newSong = {
+    id: Date.now() + Math.floor(Math.random() * 100000),
+    title: clean.title,
+    genre: clean.genre,
+    url: clean.url,
+    memo: clean.memo,
+    done: false,
+    abc: "",
+    tags: clean.tags,
+    aliases: clean.aliases
+  };
+
+  songs.unshift(newSong);
+  return { action: "create", song: newSong };
+}
+
+function generateUniqueSetName(baseName) {
+  const original = String(baseName || "").trim() || "SET";
+  const existingNames = new Set(sets.map(set => set.name));
+
+  if (!existingNames.has(original)) return original;
+
+  let n = 2;
+  while (existingNames.has(`${original} (${n})`)) {
+    n++;
+  }
+  return `${original} (${n})`;
+}
+
+function makeSetSharePayload(setObj) {
+  const shareSongs = [];
+  const items = (setObj.items || []).map((item, index) => {
+    if (item.type === "song") {
+      const song = getSongById(item.songId);
+      if (!song) return null;
+
+      const shareSongId = `song_${index}_${song.id}`;
+      shareSongs.push({
+        shareSongId,
+        title: song.title || "",
+        genre: song.genre || "Other",
+        url: song.url || "",
+        memo: song.memo || "",
+        tags: Array.isArray(song.tags) ? [...song.tags] : [],
+        aliases: Array.isArray(song.aliases) ? [...song.aliases] : []
+      });
+
+      return {
+        type: "song",
+        shareSongId
+      };
+    }
+
+    return {
+      type: "custom",
+      title: item.title || "",
+      memo: item.memo || ""
+    };
+  }).filter(Boolean);
+
+  return {
+    type: "irish-set-card",
+    version: 1,
+    set: {
+      name: setObj.name || "SET",
+      memo: setObj.memo || "",
+      tags: Array.isArray(setObj.tags) ? [...setObj.tags] : [],
+      items
+    },
+    songs: shareSongs
+  };
+}
+
+async function shareSet(setId) {
+  const setObj = getSetById(setId);
+  if (!setObj) return;
+
+  const code = toShareCode(makeSetSharePayload(setObj));
+  setShareOutput(code);
+  switchTab("share");
+
+  const ok = await copyText(code);
+  alert(ok ? "SET共有コードをコピーしました。" : "共有コードを表示しました。必要なら手動でコピーしてください。");
+}
+
+function importSongCard(payload) {
+  const result = addImportedSong(payload.song);
+  saveSongs();
+
+  if (result.action === "reuse") {
+    return `曲カード取り込み完了\n既存曲を使用: ${result.song.title}`;
+  }
+  if (result.action === "create") {
+    return `曲カード取り込み完了\n新規追加: ${result.song.title}`;
+  }
+  return "曲カードを取り込めませんでした。";
+}
+
+function importSetCard(payload) {
+  const sharedSongs = Array.isArray(payload.songs) ? payload.songs : [];
+  const setData = payload.set || {};
+  const shareMap = new Map();
+
+  let reusedCount = 0;
+  let createdCount = 0;
+
+  sharedSongs.forEach(songData => {
+    const result = addImportedSong(songData);
+    if (result.song && songData.shareSongId) {
+      shareMap.set(songData.shareSongId, result.song.id);
+      if (result.action === "reuse") reusedCount++;
+      if (result.action === "create") createdCount++;
+    }
+  });
+
+  const importedItems = (Array.isArray(setData.items) ? setData.items : []).map(item => {
+    if (item.type === "song") {
+      const mappedSongId = shareMap.get(item.shareSongId);
+      if (!mappedSongId) return null;
+      return {
+        type: "song",
+        songId: mappedSongId
+      };
+    }
+    return {
+      type: "custom",
+      title: String(item.title || "").trim(),
+      memo: String(item.memo || "").trim()
+    };
+  }).filter(Boolean);
+
+  const setName = generateUniqueSetName(setData.name || "SET");
+
+  sets.unshift({
+    id: Date.now() + Math.floor(Math.random() * 100000),
+    name: setName,
+    memo: String(setData.memo || "").trim(),
+    tags: uniqueTags(setData.tags || []),
+    items: importedItems
+  });
+
+  saveAll();
+
+  return `SET取り込み完了
+SET名: ${setName}
+既存曲を使用: ${reusedCount}曲
+新規追加: ${createdCount}曲
+SET内項目数: ${importedItems.length}`;
+}
+
+function importSharedData() {
+  const input = document.getElementById("importInput");
+  const resultEl = document.getElementById("importResult");
+  const raw = String(input?.value || "").trim();
+
+  if (!raw) {
+    resultEl.textContent = "共有コードを入力してください。";
+    resultEl.className = "import-result err";
+    return;
+  }
+
+  try {
+    const payload = JSON.parse(raw);
+
+    let message = "";
+
+    if (payload.type === "irish-tune-card") {
+      message = importSongCard(payload);
+    } else if (payload.type === "irish-set-card") {
+      message = importSetCard(payload);
+    } else {
+      throw new Error("未対応の共有形式です。");
+    }
+
+    resultEl.textContent = message;
+    resultEl.className = "import-result ok";
+    renderAll();
+  } catch (e) {
+    console.error(e);
+    resultEl.textContent = `取り込み失敗: ${e.message || "形式が正しくありません。"}`;
+    resultEl.className = "import-result err";
+  }
+}
+
+function clearImportArea() {
+  const input = document.getElementById("importInput");
+  const resultEl = document.getElementById("importResult");
+  if (input) input.value = "";
+  if (resultEl) {
+    resultEl.textContent = "まだ取り込みしていません。";
+    resultEl.className = "import-result muted";
+  }
+}
+
+async function copyShareOutput() {
+  const output = document.getElementById("shareOutput");
+  const text = String(output?.value || "").trim();
+
+  if (!text) {
+    alert("共有コードがありません。");
+    return;
+  }
+
+  const ok = await copyText(text);
+  alert(ok ? "共有コードをコピーしました。" : "コピーできませんでした。手動でコピーしてください。");
+}
+
+function clearShareOutput() {
+  const output = document.getElementById("shareOutput");
+  if (output) output.value = "";
+}
+
+/* ===== 全体描画 ===== */
 
 function renderAll() {
   updateTagFilterOptions();
