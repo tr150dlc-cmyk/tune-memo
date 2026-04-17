@@ -499,7 +499,7 @@ a {
       <label>メモ</label>
       <textarea id="memoInput" placeholder="覚書、参考動画URL、Spotifyリンクなど"></textarea>
 
-      <label>属性タグ</label>
+      <label>グループ化・フィルタリングタグ</label>
       <div id="songTagEditor" class="tag-picker-box"></div>
 
       <button id="saveButton" type="button" onclick="addOrUpdateSong()">追加</button>
@@ -546,7 +546,7 @@ a {
         </div>
 
         <div class="filter-select">
-          <label>属性タグ</label>
+          <label>グループ化・フィルタリングタグ</label>
           <select id="songTagFilterSelect" onchange="setSongTagFilter(this.value)">
             <option value="all">ALL</option>
           </select>
@@ -606,7 +606,7 @@ a {
       <h3>選択した曲</h3>
       <div id="tempSetList" class="set-box"></div>
 
-      <label>属性タグ</label>
+      <label>グループ化・フィルタリングタグ</label>
       <div id="setTagEditor" class="tag-picker-box"></div>
 
       <button type="button" onclick="saveTempSet()">SET登録</button>
@@ -625,7 +625,7 @@ a {
         </div>
 
         <div class="filter-select">
-          <label>属性タグ</label>
+          <label>グループ化・フィルタリングタグ</label>
           <select id="setTagFilterSelect" onchange="setSetTagFilter(this.value)">
             <option value="all">ALL</option>
           </select>
@@ -1551,7 +1551,7 @@ function editSet(setId) {
       <label>メモ（参考URLなど）</label>
       <textarea id="editSetMemo">${escapeHtml(set.memo || "")}</textarea>
 
-      <label>属性タグ</label>
+      <label>グループ化・フィルタリングタグ</label>
       <div id="editSetTagEditor" class="tag-picker-box"></div>
 
       <div style="margin-top:12px;">
