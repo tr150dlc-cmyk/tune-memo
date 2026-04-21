@@ -704,6 +704,30 @@ a {
         <button type="button" onclick="copyShareOutput()">共有コードをコピー</button>
         <button type="button" class="sub" onclick="clearShareOutput()">表示をクリア</button>
       </div>
+
+      <hr class="section-divider">
+
+      <h3>バックアップ</h3>
+      <div class="info-box">
+        曲・SET・メモ・タグなどの現在データを JSON ファイルとして書き出します。<br>
+        復元すると、<strong>現在のデータはバックアップ内容で置き換え</strong>られます。
+      </div>
+
+      <div class="inline-actions" style="margin-top:12px;">
+        <button type="button" onclick="exportBackupData()">バックアップを書き出す</button>
+        <button type="button" class="sub" onclick="triggerBackupImport()">バックアップを読み込む</button>
+      </div>
+
+      <input
+        id="backupFileInput"
+        type="file"
+        accept=".json,application/json"
+        style="display:none;"
+        onchange="importBackupFile(this.files[0])"
+      >
+
+      <h3>バックアップ結果</h3>
+      <div id="backupResult" class="import-result muted">まだバックアップ操作をしていません。</div>
     </div>
   </div>
 
@@ -2275,6 +2299,140 @@ function clearShareOutput() {
   if (output) output.value = "";
 }
 
+/* ===== バックアップ機能 ===== */
+
+function makeBackupPayload() {
+  return {
+    type: "irish-tune-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    songs: songs,
+    sets: sets
+  };
+}
+
+function setBackupResult(message, kind = "muted") {
+  const resultEl = document.getElementById("backupResult");
+  if (!resultEl) return;
+  resultEl.textContent = message;
+
+  if (kind === "ok") {
+    resultEl.className = "import-result ok";
+  } else if (kind === "err") {
+    resultEl.className = "import-result err";
+  } else {
+    resultEl.className = "import-result muted";
+  }
+}
+
+function exportBackupData() {
+  try {
+    const payload = makeBackupPayload();
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const filename =
+      `irish-tune-backup-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.json`;
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+
+    setBackupResult(`バックアップを書き出しました。\nファイル名: ${filename}`, "ok");
+    switchTab("share");
+  } catch (e) {
+    console.error(e);
+    setBackupResult(`バックアップ書き出し失敗: ${e.message || "不明なエラー"}`, "err");
+  }
+}
+
+function triggerBackupImport() {
+  const input = document.getElementById("backupFileInput");
+  if (!input) return;
+  input.value = "";
+  input.click();
+}
+
+function importBackupFile(file) {
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function() {
+    try {
+      const raw = String(reader.result || "");
+      const payload = JSON.parse(raw);
+
+      if (payload.type !== "irish-tune-backup") {
+        throw new Error("バックアップ形式ではありません。");
+      }
+
+      const nextSongs = Array.isArray(payload.songs) ? payload.songs : null;
+      const nextSets = Array.isArray(payload.sets) ? payload.sets : null;
+
+      if (!nextSongs || !nextSets) {
+        throw new Error("songs / sets の形式が不正です。");
+      }
+
+      const ok = confirm(
+        "バックアップを復元しますか？\n\n現在の曲・SETデータは、バックアップ内容で上書きされます。"
+      );
+      if (!ok) {
+        setBackupResult("バックアップ復元を中止しました。", "muted");
+        return;
+      }
+
+      songs = nextSongs.map(song => ({
+        ...song,
+        tags: Array.isArray(song.tags) ? song.tags : [],
+        aliases: Array.isArray(song.aliases) ? song.aliases : [],
+        memo: song.memo || "",
+        genre: song.genre || "Other",
+        done: !!song.done,
+        abc: song.abc || ""
+      }));
+
+      sets = nextSets.map(set => ({
+        ...set,
+        memo: set.memo || "",
+        tags: Array.isArray(set.tags) ? set.tags : [],
+        items: Array.isArray(set.items)
+          ? set.items
+          : Array.isArray(set.songIds)
+            ? set.songIds.map(songId => ({ type: "song", songId }))
+            : []
+      }));
+
+      saveAll();
+      renderAll();
+      switchTab("share");
+
+      const exportedAt = payload.exportedAt ? `\n作成日時: ${payload.exportedAt}` : "";
+      setBackupResult(
+        `バックアップを復元しました。${exportedAt}\n曲数: ${songs.length}\nSET数: ${sets.length}`,
+        "ok"
+      );
+    } catch (e) {
+      console.error(e);
+      setBackupResult(`バックアップ復元失敗: ${e.message || "形式が正しくありません。"}`, "err");
+    }
+  };
+
+  reader.onerror = function() {
+    setBackupResult("バックアップファイルを読み込めませんでした。", "err");
+  };
+
+  reader.readAsText(file);
+}
+
 /* ===== 全体描画 ===== */
 
 function renderAll() {
@@ -2288,6 +2446,7 @@ function renderAll() {
 }
 
 renderAll();
+setBackupResult("まだバックアップ操作をしていません。", "muted");
 </script>
 </body>
 </html>
