@@ -97,7 +97,7 @@ button.small {
 
 .top-tabs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -496,6 +496,86 @@ a {
   background: #ffd8a8;
   color: #9a5b00;
 }
+
+.tab-btn[data-tab="today"].active {
+  background: #8ce99a;
+  color: #245c2d;
+}
+
+/* ===== 今日の練習 ===== */
+.today-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.today-stat {
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 12px;
+  text-align: center;
+}
+
+.today-stat strong {
+  display: block;
+  font-size: 22px;
+  color: #495057;
+}
+
+.practice-item {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 10px;
+}
+
+.practice-item.overdue {
+  border-color: #ffc9c9;
+  background: #fff8f8;
+}
+
+.practice-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.practice-actions button {
+  padding: 10px 6px;
+}
+
+.practice-actions .good { background: #8ce99a; color: #245c2d; }
+.practice-actions .hard { background: #ffe066; color: #6b5600; }
+.practice-actions .again { background: #ffa8a8; color: #7a2020; }
+
+.today-empty {
+  padding: 20px;
+  border: 1px dashed #b2f2bb;
+  border-radius: 14px;
+  background: #f4fff6;
+  color: #3f7a4d;
+  text-align: center;
+}
+
+.review-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 8px;
+  margin-left: 6px;
+  background: #edf2ff;
+  color: #4263eb;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .today-summary { grid-template-columns: repeat(2, 1fr); }
+  .practice-actions { grid-template-columns: 1fr; }
+}
+
 </style>
 </head>
 
@@ -508,14 +588,23 @@ a {
   </div>
 
   <div class="top-tabs">
-    <button class="tab-btn active" data-tab="addSong" onclick="switchTab('addSong')">曲を追加</button>
+    <button class="tab-btn active" data-tab="today" onclick="switchTab('today')">今日の練習</button>
+    <button class="tab-btn" data-tab="addSong" onclick="switchTab('addSong')">曲を追加</button>
     <button class="tab-btn" data-tab="songList" onclick="switchTab('songList')">曲一覧</button>
     <button class="tab-btn" data-tab="createSet" onclick="switchTab('createSet')">SET作成</button>
     <button class="tab-btn" data-tab="setList" onclick="switchTab('setList')">SET一覧</button>
     <button class="tab-btn" data-tab="share" onclick="switchTab('share')">共有</button>
   </div>
 
-  <div id="tab-addSong" class="tab-panel active">
+  <div id="tab-today" class="tab-panel active">
+    <div class="card">
+      <h2>今日の練習</h2>
+      <div class="muted">復習期限が来た曲を自動表示します。演奏後に評価ボタンを押すと、次回の復習日が自動で決まります。</div>
+      <div id="todayPractice"></div>
+    </div>
+  </div>
+
+  <div id="tab-addSong" class="tab-panel">
     <div class="card">
       <h2 id="formTitle">曲を追加</h2>
 
@@ -773,7 +862,7 @@ let currentSetTagFilter = "all";
 let currentSongSearch = "";
 let currentSetSearch = "";
 let editingId = null;
-let currentTab = "addSong";
+let currentTab = "today";
 let tempSetItems = [];
 let openSetSongDetailId = null;
 let focusedSongId = null;
@@ -790,7 +879,12 @@ songs = songs.map(song => ({
   memo: song.memo || "",
   genre: song.genre || "Other",
   done: !!song.done,
-  abc: song.abc || ""
+  abc: song.abc || "",
+  reviewLevel: Number.isFinite(Number(song.reviewLevel)) ? Number(song.reviewLevel) : 0,
+  lastPlayed: song.lastPlayed || "",
+  nextReview: song.nextReview || "",
+  reviewCount: Number.isFinite(Number(song.reviewCount)) ? Number(song.reviewCount) : 0,
+  lastResult: song.lastResult || ""
 }));
 
 sets = sets.map(set => ({
@@ -830,6 +924,10 @@ function switchTab(tabName) {
     renderTempSet();
     renderSetTagEditor();
   }
+
+  if (tabName === "today") {
+    renderToday();
+  }
 }
 
 function saveSongs() {
@@ -843,6 +941,191 @@ function saveSets() {
 function saveAll() {
   saveSongs();
   saveSets();
+}
+
+
+/* ===== 間隔反復・今日の練習 ===== */
+const REVIEW_INTERVALS = [1, 3, 7, 14, 30, 60, 90, 180];
+
+function localDateString(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function addDays(dateString, days) {
+  const base = dateString ? new Date(`${dateString}T12:00:00`) : new Date();
+  base.setDate(base.getDate() + Number(days || 0));
+  return localDateString(base);
+}
+
+function daysBetween(fromString, toString) {
+  const from = new Date(`${fromString}T12:00:00`);
+  const to = new Date(`${toString}T12:00:00`);
+  return Math.round((to - from) / 86400000);
+}
+
+function ensureReviewSchedule(song) {
+  if (!song.done) return song;
+  if (!song.nextReview) song.nextReview = localDateString();
+  if (!Number.isFinite(Number(song.reviewLevel))) song.reviewLevel = 0;
+  if (!Number.isFinite(Number(song.reviewCount))) song.reviewCount = 0;
+  return song;
+}
+
+function getDueSongs() {
+  const today = localDateString();
+  return songs
+    .filter(song => song.done)
+    .map(ensureReviewSchedule)
+    .filter(song => !song.nextReview || song.nextReview <= today)
+    .sort((a, b) => {
+      const dateCompare = String(a.nextReview || "").localeCompare(String(b.nextReview || ""));
+      if (dateCompare !== 0) return dateCompare;
+      return String(a.title || "").localeCompare(String(b.title || ""), "ja");
+    });
+}
+
+function getNewTuneCandidates(limit = 2) {
+  return songs
+    .filter(song => !song.done)
+    .slice()
+    .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))
+    .slice(0, limit);
+}
+
+function reviewSong(id, result) {
+  const today = localDateString();
+  songs = songs.map(song => {
+    if (song.id !== id) return song;
+
+    let level = Number(song.reviewLevel || 0);
+    let interval = 1;
+
+    if (result === "good") {
+      level = Math.min(level + 1, REVIEW_INTERVALS.length - 1);
+      interval = REVIEW_INTERVALS[level];
+    } else if (result === "hard") {
+      level = Math.max(0, level);
+      interval = level <= 1 ? 2 : Math.max(3, Math.round(REVIEW_INTERVALS[level] * 0.45));
+    } else {
+      level = 0;
+      interval = 1;
+    }
+
+    return {
+      ...song,
+      done: true,
+      reviewLevel: level,
+      lastPlayed: today,
+      nextReview: addDays(today, interval),
+      reviewCount: Number(song.reviewCount || 0) + 1,
+      lastResult: result
+    };
+  });
+
+  saveSongs();
+  renderAll();
+}
+
+function markNewTuneLearned(id) {
+  const today = localDateString();
+  songs = songs.map(song => song.id === id
+    ? {
+        ...song,
+        done: true,
+        reviewLevel: 0,
+        lastPlayed: today,
+        nextReview: addDays(today, 1),
+        reviewCount: Number(song.reviewCount || 0),
+        lastResult: "new"
+      }
+    : song
+  );
+  saveSongs();
+  renderAll();
+}
+
+function formatReviewDate(dateString) {
+  if (!dateString) return "今日";
+  const today = localDateString();
+  const diff = daysBetween(today, dateString);
+  if (diff === 0) return "今日";
+  if (diff === 1) return "明日";
+  if (diff > 1) return `${diff}日後`;
+  return `${Math.abs(diff)}日超過`;
+}
+
+function renderToday() {
+  const container = document.getElementById("todayPractice");
+  if (!container) return;
+
+  const today = localDateString();
+  const dueSongs = getDueSongs();
+  const newTunes = getNewTuneCandidates(2);
+  const learnedCount = songs.filter(song => song.done).length;
+  const estimatedMinutes = dueSongs.length * 2 + newTunes.length * 8;
+
+  const summary = `
+    <div class="today-summary">
+      <div class="today-stat"><strong>${dueSongs.length}</strong>復習曲</div>
+      <div class="today-stat"><strong>${newTunes.length}</strong>新曲候補</div>
+      <div class="today-stat"><strong>${learnedCount}</strong>習得済み</div>
+      <div class="today-stat"><strong>約${estimatedMinutes}</strong>分</div>
+    </div>
+  `;
+
+  const dueHtml = dueSongs.length
+    ? dueSongs.map(song => {
+        const overdue = song.nextReview && song.nextReview < today;
+        return `
+          <div class="practice-item ${overdue ? "overdue" : ""}">
+            <div class="title-row">
+              <div class="title">${escapeHtml(song.title)}</div>
+              <span class="review-badge">${escapeHtml(formatReviewDate(song.nextReview))}</span>
+              ${renderTags(song.tags)}
+            </div>
+            ${renderAliases(song.aliases)}
+            <div class="meta">${escapeHtml(song.genre || "Other")} / 復習 ${Number(song.reviewCount || 0)}回</div>
+            ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
+            <div class="practice-actions">
+              <button class="good" type="button" onclick="reviewSong(${song.id}, 'good')">😊 弾けた</button>
+              <button class="hard" type="button" onclick="reviewSong(${song.id}, 'hard')">😐 少しミス</button>
+              <button class="again" type="button" onclick="reviewSong(${song.id}, 'again')">😣 弾けない</button>
+            </div>
+            <div class="inline-actions">
+              <button class="small sub" type="button" onclick="openSongFromSet(${song.id})">譜面・詳細を見る</button>
+            </div>
+          </div>
+        `;
+      }).join("")
+    : `<div class="today-empty">今日が期限の復習曲はありません。よく続いています。</div>`;
+
+  const newHtml = newTunes.length
+    ? newTunes.map(song => `
+        <div class="practice-item">
+          <div class="title-row">
+            <div class="title">${escapeHtml(song.title)}</div>
+            ${renderTags(song.tags)}
+          </div>
+          ${renderAliases(song.aliases)}
+          <div class="meta">${escapeHtml(song.genre || "Other")}</div>
+          <div class="inline-actions">
+            <button class="small" type="button" onclick="markNewTuneLearned(${song.id})">覚えたので復習開始</button>
+            <button class="small sub" type="button" onclick="openSongFromSet(${song.id})">譜面・詳細を見る</button>
+          </div>
+        </div>
+      `).join("")
+    : `<div class="today-empty">未習得の曲はありません。新しい曲を追加してください。</div>`;
+
+  container.innerHTML = `
+    ${summary}
+    <h3>🔁 今日の復習</h3>
+    ${dueHtml}
+    <h3>🆕 新曲候補</h3>
+    ${newHtml}
+  `;
 }
 
 function extractTuneId(url) {
@@ -1300,6 +1583,11 @@ async function addOrUpdateSong() {
     memo: songMemo,
     done: false,
     abc: "",
+    reviewLevel: 0,
+    lastPlayed: "",
+    nextReview: "",
+    reviewCount: 0,
+    lastResult: "",
     tags: songTags,
     aliases: [...fetchedAliases]
   };
@@ -1446,11 +1734,22 @@ function filteredSets() {
 }
 
 function toggleDone(id) {
-  songs = songs.map(song =>
-    song.id === id ? { ...song, done: !song.done } : song
-  );
+  const today = localDateString();
+  songs = songs.map(song => {
+    if (song.id !== id) return song;
+    const willBeDone = !song.done;
+    return {
+      ...song,
+      done: willBeDone,
+      reviewLevel: willBeDone ? Number(song.reviewLevel || 0) : 0,
+      lastPlayed: willBeDone ? (song.lastPlayed || today) : "",
+      nextReview: willBeDone ? (song.nextReview || addDays(today, 1)) : "",
+      reviewCount: willBeDone ? Number(song.reviewCount || 0) : 0,
+      lastResult: willBeDone ? (song.lastResult || "new") : ""
+    };
+  });
   saveSongs();
-  renderSongs();
+  renderAll();
 }
 
 function delSong(id) {
@@ -1545,6 +1844,7 @@ function renderSongs() {
 
       ${renderAliases(song.aliases)}
       <div class="meta">ジャンル: ${escapeHtml(song.genre || "Other")}</div>
+      ${song.done ? `<div class="meta">次回復習: ${escapeHtml(song.nextReview || "未設定")}（${escapeHtml(formatReviewDate(song.nextReview))}） / 復習 ${Number(song.reviewCount || 0)}回</div>` : ""}
       <div id="abc-${song.id}" class="notation"></div>
       ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
       ${song.url ? `<div class="meta"><a href="${escapeHtml(song.url)}" target="_blank" rel="noopener noreferrer">The Session を開く</a></div>` : ""}
@@ -1553,6 +1853,11 @@ function renderSongs() {
         <button class="small" type="button" onclick="toggleDone(${song.id})">
           ${song.done ? "未習得に戻す" : "習得にする"}
         </button>
+        ${song.done ? `
+          <button class="small" type="button" onclick="reviewSong(${song.id}, 'good')">弾けた</button>
+          <button class="small" type="button" onclick="reviewSong(${song.id}, 'hard')">少しミス</button>
+          <button class="small sub" type="button" onclick="reviewSong(${song.id}, 'again')">弾けない</button>
+        ` : ""}
         <button class="small" type="button" onclick="startEdit(${song.id})">編集</button>
         <button class="small" type="button" onclick="shareSong(${song.id})">共有</button>
         <button class="small sub" type="button" onclick="delSong(${song.id})">削除</button>
@@ -2540,6 +2845,7 @@ function clearBackupImportArea() {
 /* ===== 全体描画 ===== */
 
 function renderAll() {
+  renderToday();
   updateTagFilterOptions();
   updateSongSelectForSet();
   renderTempSet();
