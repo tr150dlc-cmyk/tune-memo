@@ -839,6 +839,7 @@ a {
 <script>
 const STORAGE_KEY = "songs";
 const SETS_STORAGE_KEY = "sets";
+const DAILY_RANDOM_STORAGE_KEY = "dailyRandomPractice";
 
 function safeLoad(key, fallback = []) {
   try {
@@ -884,7 +885,8 @@ songs = songs.map(song => ({
   lastPlayed: song.lastPlayed || "",
   nextReview: song.nextReview || "",
   reviewCount: Number.isFinite(Number(song.reviewCount)) ? Number(song.reviewCount) : 0,
-  lastResult: song.lastResult || ""
+  lastResult: song.lastResult || "",
+  lastRandomPractice: song.lastRandomPractice || ""
 }));
 
 sets = sets.map(set => ({
@@ -946,6 +948,8 @@ function saveAll() {
 
 /* ===== 間隔反復・今日の練習 ===== */
 const REVIEW_INTERVALS = [1, 3, 7, 14, 30, 60, 90, 180];
+const MIN_DAILY_REVIEW = 10;
+const RANDOM_COOLDOWN_DAYS = 7;
 
 function localDateString(date = new Date()) {
   const y = date.getFullYear();
@@ -985,6 +989,81 @@ function getDueSongs() {
       if (dateCompare !== 0) return dateCompare;
       return String(a.title || "").localeCompare(String(b.title || ""), "ja");
     });
+}
+
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function loadDailyRandomPlan() {
+  try {
+    const raw = localStorage.getItem(DAILY_RANDOM_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.date !== localDateString() || !Array.isArray(parsed.ids)) return null;
+    return parsed;
+  } catch (e) {
+    console.error("Failed to load daily random practice plan", e);
+    return null;
+  }
+}
+
+function saveDailyRandomPlan(ids) {
+  const payload = {
+    date: localDateString(),
+    ids: Array.from(new Set((ids || []).map(Number).filter(Number.isFinite)))
+  };
+  localStorage.setItem(DAILY_RANDOM_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function getRandomPracticeSongs(dueSongs, minimumCount = MIN_DAILY_REVIEW) {
+  // 同じ日は最初に決めたランダム曲を固定する。
+  // 評価後の再描画で別の曲が補充され続けるのを防ぐため。
+  const existingPlan = loadDailyRandomPlan();
+  if (existingPlan) {
+    return existingPlan.ids
+      .map(id => songs.find(song => song.id === id))
+      .filter(song => song && song.done);
+  }
+
+  const needed = Math.max(0, minimumCount - dueSongs.length);
+  if (needed === 0) {
+    saveDailyRandomPlan([]);
+    return [];
+  }
+
+  const today = localDateString();
+  const dueIds = new Set(dueSongs.map(song => song.id));
+
+  // 習得済みで、今日が期限の正式復習曲ではない曲を候補にする。
+  const baseCandidates = songs.filter(song => song.done && !dueIds.has(song.id));
+
+  // 過去7日以内にランダム練習した曲は原則除外。
+  const preferredCandidates = baseCandidates.filter(song => {
+    if (!song.lastRandomPractice) return true;
+    const days = daysBetween(song.lastRandomPractice, today);
+    return days >= RANDOM_COOLDOWN_DAYS;
+  });
+
+  let selected = shuffleArray(preferredCandidates).slice(0, needed);
+
+  // 7日クールダウンを守ると数が足りない場合だけ、残りから補充。
+  if (selected.length < needed) {
+    const selectedIds = new Set(selected.map(song => song.id));
+    const fallbackCandidates = baseCandidates.filter(song => !selectedIds.has(song.id));
+    selected = [
+      ...selected,
+      ...shuffleArray(fallbackCandidates).slice(0, needed - selected.length)
+    ];
+  }
+
+  saveDailyRandomPlan(selected.map(song => song.id));
+  return selected;
 }
 
 function getNewTuneCandidates(limit = 2) {
@@ -1029,6 +1108,44 @@ function reviewSong(id, result) {
   renderAll();
 }
 
+function reviewRandomSong(id, result) {
+  const today = localDateString();
+
+  songs = songs.map(song => {
+    if (song.id !== id) return song;
+
+    let nextReview = song.nextReview;
+
+    if (result === "hard") {
+      const proposedDate = addDays(today, 3);
+      // 本来の復習日が3日以内なら、その予定を遅らせない。
+      if (!nextReview || nextReview > proposedDate) {
+        nextReview = proposedDate;
+      }
+    } else if (result === "again") {
+      // 弾けなかった場合は翌日に正式復習へ。
+      nextReview = addDays(today, 1);
+    }
+    // good は本来の nextReview を変更しない。
+
+    return {
+      ...song,
+      lastPlayed: today,
+      nextReview,
+      lastRandomPractice: today,
+      lastResult:
+        result === "good"
+          ? "random-good"
+          : result === "hard"
+            ? "random-hard"
+            : "random-again"
+    };
+  });
+
+  saveSongs();
+  renderAll();
+}
+
 function markNewTuneLearned(id) {
   const today = localDateString();
   songs = songs.map(song => song.id === id
@@ -1063,14 +1180,16 @@ function renderToday() {
 
   const today = localDateString();
   const dueSongs = getDueSongs();
+  const randomSongs = getRandomPracticeSongs(dueSongs);
   const newTunes = getNewTuneCandidates(2);
   const learnedCount = songs.filter(song => song.done).length;
-  const estimatedMinutes = dueSongs.length * 2 + newTunes.length * 8;
+  const totalReviewCount = dueSongs.length + randomSongs.length;
+  const estimatedMinutes = totalReviewCount * 2 + newTunes.length * 8;
 
   const summary = `
     <div class="today-summary">
-      <div class="today-stat"><strong>${dueSongs.length}</strong>復習曲</div>
-      <div class="today-stat"><strong>${newTunes.length}</strong>新曲候補</div>
+      <div class="today-stat"><strong>${totalReviewCount}</strong>今日の練習</div>
+      <div class="today-stat"><strong>${randomSongs.length}</strong>ランダム</div>
       <div class="today-stat"><strong>${learnedCount}</strong>習得済み</div>
       <div class="today-stat"><strong>約${estimatedMinutes}</strong>分</div>
     </div>
@@ -1100,7 +1219,39 @@ function renderToday() {
           </div>
         `;
       }).join("")
-    : `<div class="today-empty">今日が期限の復習曲はありません。よく続いています。</div>`;
+    : `<div class="today-empty">今日が期限の復習曲はありません。</div>`;
+
+  const randomHtml = randomSongs.length
+    ? randomSongs.map(song => {
+        const practicedToday = song.lastRandomPractice === today;
+        return `
+          <div class="practice-item">
+            <div class="title-row">
+              <div class="title">${escapeHtml(song.title)}</div>
+              <span class="review-badge">🎲 ランダム</span>
+              ${practicedToday ? `<span class="review-badge">✓ 本日評価済み</span>` : ""}
+              ${renderTags(song.tags)}
+            </div>
+            ${renderAliases(song.aliases)}
+            <div class="meta">${escapeHtml(song.genre || "Other")} / 抜き打ち復習</div>
+            ${song.memo ? `<div class="memo-block">${linkifyText(song.memo)}</div>` : ""}
+            ${practicedToday
+              ? `<div class="today-empty" style="padding:10px; margin-top:10px;">この曲は今日すでに評価しました。</div>`
+              : `
+                <div class="practice-actions">
+                  <button class="good" type="button" onclick="reviewRandomSong(${song.id}, 'good')">😊 弾けた</button>
+                  <button class="hard" type="button" onclick="reviewRandomSong(${song.id}, 'hard')">😐 少しミス</button>
+                  <button class="again" type="button" onclick="reviewRandomSong(${song.id}, 'again')">😣 弾けない</button>
+                </div>
+              `
+            }
+            <div class="inline-actions">
+              <button class="small sub" type="button" onclick="openSongFromSet(${song.id})">譜面・詳細を見る</button>
+            </div>
+          </div>
+        `;
+      }).join("")
+    : "";
 
   const newHtml = newTunes.length
     ? newTunes.map(song => `
@@ -1121,8 +1272,19 @@ function renderToday() {
 
   container.innerHTML = `
     ${summary}
-    <h3>🔁 今日の復習</h3>
+    <h3>🔁 今日が期限の復習</h3>
     ${dueHtml}
+    ${randomSongs.length
+      ? `
+        <h3>🎲 今日のランダム復習</h3>
+        <div class="muted">
+          今日の期限復習が10曲未満だったため、習得済み曲から不足分を選びました。<br>
+          同じ日のランダム曲は固定され、過去7日以内にランダム練習した曲はなるべく避けます。
+        </div>
+        ${randomHtml}
+      `
+      : ""
+    }
     <h3>🆕 新曲候補</h3>
     ${newHtml}
   `;
@@ -1588,6 +1750,7 @@ async function addOrUpdateSong() {
     nextReview: "",
     reviewCount: 0,
     lastResult: "",
+    lastRandomPractice: "",
     tags: songTags,
     aliases: [...fetchedAliases]
   };
@@ -1745,7 +1908,8 @@ function toggleDone(id) {
       lastPlayed: willBeDone ? (song.lastPlayed || today) : "",
       nextReview: willBeDone ? (song.nextReview || addDays(today, 1)) : "",
       reviewCount: willBeDone ? Number(song.reviewCount || 0) : 0,
-      lastResult: willBeDone ? (song.lastResult || "new") : ""
+      lastResult: willBeDone ? (song.lastResult || "new") : "",
+      lastRandomPractice: willBeDone ? (song.lastRandomPractice || "") : ""
     };
   });
   saveSongs();
